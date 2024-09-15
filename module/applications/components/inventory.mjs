@@ -33,7 +33,7 @@ export default class InventoryElement extends HTMLElement {
 
     for ( const control of this.querySelectorAll(".item-action[data-action]") ) {
       control.addEventListener("click", event => {
-        this._onAction(event.currentTarget, event.currentTarget.dataset.action);
+        this._onAction(event.currentTarget, event.currentTarget.dataset.action, { event });
       });
     }
 
@@ -48,8 +48,14 @@ export default class InventoryElement extends HTMLElement {
       });
     }
 
+    // Bind activity menu to child to work around lack of stopImmediatePropagation in ContextMenu#bind
+    new ContextMenu5e(this.querySelector(".items-list"), ".activity-row[data-activity-id]", [], {
+      onOpen: this._onOpenContextMenu.bind(this)
+    });
+
+    // Item context menus
     const MenuCls = this.hasAttribute("v2") ? ContextMenu5e : ContextMenu;
-    new MenuCls(this, "[data-item-id]", [], {onOpen: this._onOpenContextMenu.bind(this)});
+    new MenuCls(this, "[data-item-id]", [], { onOpen: this._onOpenContextMenu.bind(this) });
   }
 
   /* -------------------------------------------- */
@@ -183,25 +189,26 @@ export default class InventoryElement extends HTMLElement {
       {
         name: "DND5E.ContextMenuActionEdit",
         icon: "<i class='fas fa-edit fa-fw'></i>",
-        condition: () => item.isOwner,
+        condition: () => item.isOwner && !item.compendium?.locked,
         callback: li => this._onAction(li[0], "edit")
       },
       {
         name: "DND5E.ItemView",
         icon: '<i class="fas fa-eye"></i>',
-        condition: () => !item.isOwner,
+        condition: () => !item.isOwner || item.compendium?.locked,
         callback: li => this._onAction(li[0], "view")
       },
       {
         name: "DND5E.ContextMenuActionDuplicate",
         icon: "<i class='fas fa-copy fa-fw'></i>",
-        condition: () => !item.system.metadata?.singleton && !["class", "subclass"].includes(item.type) && item.isOwner,
+        condition: () => !item.system.metadata?.singleton && !["class", "subclass"].includes(item.type) && item.isOwner
+          && !item.compendium?.locked,
         callback: li => this._onAction(li[0], "duplicate")
       },
       {
         name: "DND5E.ContextMenuActionDelete",
         icon: "<i class='fas fa-trash fa-fw'></i>",
-        condition: () => item.isOwner,
+        condition: () => item.isOwner && !item.compendium?.locked,
         callback: li => this._onAction(li[0], "delete")
       },
       {
@@ -211,14 +218,14 @@ export default class InventoryElement extends HTMLElement {
           const scroll = await Item5e.createScrollFromSpell(item);
           if ( scroll ) Item5e.create(scroll, { parent: this.actor });
         },
-        condition: li => (item.type === "spell") && this.actor?.isOwner,
+        condition: li => (item.type === "spell") && this.actor?.isOwner && !this.actor?.compendium?.locked,
         group: "action"
       },
       {
         name: "DND5E.ConcentrationBreak",
         icon: '<dnd5e-icon src="systems/dnd5e/icons/svg/break-concentration.svg"></dnd5e-icon>',
-        condition: () => this.actor.concentration?.items.has(item),
-        callback: () => this.actor.endConcentration(item),
+        condition: () => this.actor?.concentration?.items.has(item),
+        callback: () => this.actor?.endConcentration(item),
         group: "state"
       }
     ];
@@ -230,7 +237,7 @@ export default class InventoryElement extends HTMLElement {
       options.push({
         name: item.system.attuned ? "DND5E.ContextMenuActionUnattune" : "DND5E.ContextMenuActionAttune",
         icon: "<i class='fas fa-sun fa-fw'></i>",
-        condition: () => item.isOwner,
+        condition: () => item.isOwner && !item.compendium?.locked,
         callback: li => this._onAction(li[0], "attune"),
         group: "state"
       });
@@ -240,16 +247,16 @@ export default class InventoryElement extends HTMLElement {
     if ( "equipped" in item.system ) options.push({
       name: item.system.equipped ? "DND5E.ContextMenuActionUnequip" : "DND5E.ContextMenuActionEquip",
       icon: "<i class='fas fa-shield-alt fa-fw'></i>",
-      condition: () => item.isOwner,
+      condition: () => item.isOwner && !item.compendium?.locked,
       callback: li => this._onAction(li[0], "equip"),
       group: "state"
     });
 
     // Toggle Charged State
-    if ( item.system.recharge?.value ) options.push({
-      name: item.system.recharge.charged ? "DND5E.ContextMenuActionExpendCharge" : "DND5E.ContextMenuActionCharge",
+    if ( item.hasRecharge ) options.push({
+      name: item.isOnCooldown ? "DND5E.ContextMenuActionCharge" : "DND5E.ContextMenuActionExpendCharge",
       icon: '<i class="fa-solid fa-bolt"></i>',
-      condition: () => item.isOwner,
+      condition: () => item.isOwner && !item.compendium?.locked,
       callback: li => this._onAction(li[0], "toggleCharge"),
       group: "state"
     });
@@ -258,7 +265,7 @@ export default class InventoryElement extends HTMLElement {
     else if ( ("preparation" in item.system) && (item.system.preparation?.mode === "prepared") ) options.push({
       name: item.system?.preparation?.prepared ? "DND5E.ContextMenuActionUnprepare" : "DND5E.ContextMenuActionPrepare",
       icon: "<i class='fas fa-sun fa-fw'></i>",
-      condition: () => item.isOwner,
+      condition: () => item.isOwner && !item.compendium?.locked,
       callback: li => this._onAction(li[0], "prepare"),
       group: "state"
     });
@@ -267,19 +274,19 @@ export default class InventoryElement extends HTMLElement {
     if ( "identified" in item.system ) options.push({
       name: "DND5E.Identify",
       icon: '<i class="fas fa-magnifying-glass"></i>',
-      condition: () => item.isOwner && !item.system.identified,
+      condition: () => item.isOwner && !item.compendium?.locked && !item.system.identified,
       callback: () => item.update({ "system.identified": true }),
       group: "state"
     });
 
     // Toggle Favorite State
-    if ( ("favorites" in this.actor.system) ) {
+    if ( "favorites" in this.actor.system ) {
       const uuid = item.getRelativeUUID(this.actor);
       const isFavorited = this.actor.system.hasFavorite(uuid);
       options.push({
         name: isFavorited ? "DND5E.FavoriteRemove" : "DND5E.Favorite",
-        icon: "<i class='fas fa-star fa-fw'></i>",
-        condition: () => item.isOwner,
+        icon: '<i class="fas fa-star fa-fw"></i>',
+        condition: () => item.isOwner && !item.compendium?.locked,
         callback: li => this._onAction(li[0], isFavorited ? "unfavorite" : "favorite"),
         group: "state"
       });
@@ -333,11 +340,21 @@ export default class InventoryElement extends HTMLElement {
     // If this is already handled by the parent sheet, skip.
     if ( this.#app?._onChangeInputDelta ) return;
     const input = event.target;
-    const itemId = input.closest("[data-item-id]")?.dataset.itemId;
+    const { itemId } = input.closest("[data-item-id]")?.dataset ?? {};
+    const { activityId } = input.closest("[data-activity-id]")?.dataset ?? {};
     const item = await this.getItem(itemId);
     if ( !item ) return;
-    const result = parseInputDelta(input, item);
-    if ( result !== undefined ) item.update({ [input.dataset.name]: result });
+    const activity = item.system.activities?.get(activityId);
+    const result = parseInputDelta(input, activity ?? item);
+    if ( result !== undefined ) {
+      // Special case handling for Item uses.
+      if ( input.dataset.name === "system.uses.value" ) {
+        item.update({ "system.uses.spent": item.system.uses.max - result });
+      } else if ( activity && (input.dataset.name === "uses.value") ) {
+        item.updateActivity(activityId, { "uses.spent": activity.uses.max - result });
+      }
+      else item.update({ [input.dataset.name]: result });
+    }
   }
 
   /* -------------------------------------------- */
@@ -364,24 +381,32 @@ export default class InventoryElement extends HTMLElement {
 
   /**
    * Handle item actions.
-   * @param {Element} target  Button or context menu entry that triggered this action.
-   * @param {string} action   Action being triggered.
+   * @param {Element} target                Button or context menu entry that triggered this action.
+   * @param {string} action                 Action being triggered.
+   * @param {object} [options]
+   * @param {PointerEvent} [options.event]  The original triggering event.
    * @returns {Promise}
    * @protected
    */
-  async _onAction(target, action) {
-    const event = new CustomEvent("inventory", {
+  async _onAction(target, action, { event }={}) {
+    const inventoryEvent = new CustomEvent("inventory", {
       bubbles: true,
       cancelable: true,
       detail: action
     });
-    if ( target.dispatchEvent(event) === false ) return;
+    if ( target.dispatchEvent(inventoryEvent) === false ) return;
 
-    const itemId = target.closest("[data-item-id]")?.dataset.itemId;
+    const { itemId } = target.closest("[data-item-id]")?.dataset ?? {};
+    const { activityId } = target.closest("[data-activity-id]")?.dataset ?? {};
     const item = await this.getItem(itemId);
     if ( !["create", "currency"].includes(action) && !item ) return;
+    const activity = item?.system.activities?.get(activityId);
 
     switch ( action ) {
+      case "activity-recharge":
+        return activity?.uses?.rollRecharge({ event });
+      case "activity-use":
+        return activity?.use({ event });
       case "attune":
         return item.update({"system.attuned": !item.system.attuned});
       case "create":
@@ -407,13 +432,13 @@ export default class InventoryElement extends HTMLElement {
       case "prepare":
         return item.update({"system.preparation.prepared": !item.system.preparation?.prepared});
       case "recharge":
-        return item.rollRecharge();
+        return item.system.uses?.rollRecharge({ event });
       case "toggleCharge":
-        return item.update({"system.recharge.charged": !item.system.recharge?.charged});
+        return item.update({ "system.uses.spent": 1 - item.system.uses.spent });
       case "unfavorite":
         return this.actor.system.removeFavorite(item.getRelativeUUID(this.actor));
       case "use":
-        return item.use({}, { event });
+        return item.use({ legacy: false, event });
     }
   }
 
@@ -478,7 +503,11 @@ export default class InventoryElement extends HTMLElement {
     const item = this.getItem(element.closest("[data-item-id]")?.dataset.itemId);
     // Parts of ContextMenu doesn't play well with promises, so don't show menus for containers in packs
     if ( !item || (item instanceof Promise) ) return;
-    ui.context.menuItems = this._getContextOptions(item, element);
-    Hooks.call("dnd5e.getItemContextOptions", item, ui.context.menuItems);
+    if ( element.closest("[data-activity-id]") ) {
+      dnd5e.documents.activity.UtilityActivity.onContextMenu(item, element);
+    } else {
+      ui.context.menuItems = this._getContextOptions(item, element);
+      Hooks.call("dnd5e.getItemContextOptions", item, ui.context.menuItems);
+    }
   }
 }

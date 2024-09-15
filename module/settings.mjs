@@ -1,4 +1,27 @@
 import { ModuleArtConfig } from "./module-art.mjs";
+import CompendiumBrowserSourceConfig from "./applications/compendium-browser-source-config.mjs";
+
+/**
+ * Register all of the system's keybindings.
+ */
+export function registerSystemKeybindings() {
+  game.keybindings.register("dnd5e", "skipDialogNormal", {
+    name: "KEYBINDINGS.DND5E.SkipDialogNormal",
+    editable: [{ key: "ShiftLeft" }, { key: "ShiftRight" }]
+  });
+
+  game.keybindings.register("dnd5e", "skipDialogAdvantage", {
+    name: "KEYBINDINGS.DND5E.SkipDialogAdvantage",
+    editable: [{ key: "AltLeft" }, { key: "AltRight" }]
+  });
+
+  game.keybindings.register("dnd5e", "skipDialogDisadvantage", {
+    name: "KEYBINDINGS.DND5E.SkipDialogDisadvantage",
+    editable: [{ key: "ControlLeft" }, { key: "ControlRight" }, { key: "OsLeft" }, { key: "OsRight" }]
+  });
+}
+
+/* -------------------------------------------- */
 
 /**
  * Register all of the system's settings.
@@ -42,6 +65,20 @@ export function registerSystemSettings() {
     }
   });
 
+  game.settings.register("dnd5e", "bloodied", {
+    name: "SETTINGS.DND5E.BLOODIED.Name",
+    hint: "SETTINGS.DND5E.BLOODIED.Hint",
+    scope: "world",
+    config: true,
+    default: "player",
+    type: String,
+    choices: {
+      all: "SETTINGS.DND5E.BLOODIED.All",
+      player: "SETTINGS.DND5E.BLOODIED.Player",
+      none: "SETTINGS.DND5E.BLOODIED.None"
+    }
+  });
+
   // Encumbrance tracking
   game.settings.register("dnd5e", "encumbrance", {
     name: "SETTINGS.5eEncumbrance.Name",
@@ -55,6 +92,21 @@ export function registerSystemSettings() {
       normal: "SETTINGS.5eEncumbrance.Normal",
       variant: "SETTINGS.5eEncumbrance.Variant"
     }
+  });
+
+  // Rules version
+  game.settings.register("dnd5e", "rulesVersion", {
+    name: "SETTINGS.DND5E.RULESVERSION.Name",
+    hint: "SETTINGS.DND5E.RULESVERSION.Hint",
+    scope: "world",
+    config: true,
+    default: "modern",
+    type: String,
+    choices: {
+      modern: "SETTINGS.DND5E.RULESVERSION.Modern",
+      legacy: "SETTINGS.DND5E.RULESVERSION.Legacy"
+    },
+    requiresReload: true
   });
 
   // Rest Recovery Rules
@@ -166,14 +218,18 @@ export function registerSystemSettings() {
     type: Boolean
   });
 
-  // Disable Experience Tracking
-  game.settings.register("dnd5e", "disableExperienceTracking", {
-    name: "SETTINGS.5eNoExpN",
-    hint: "SETTINGS.5eNoExpL",
+  // Leveling Mode
+  game.settings.register("dnd5e", "levelingMode", {
+    name: "SETTINGS.DND5E.LEVELING.Name",
+    hint: "SETTINGS.DND5E.LEVELING.Hint",
     scope: "world",
     config: true,
-    default: false,
-    type: Boolean
+    default: "xpBoons",
+    choices: {
+      noxp: "SETTINGS.DND5E.LEVELING.NoXP",
+      xp: "SETTINGS.DND5E.LEVELING.XP",
+      xpBoons: "SETTINGS.DND5E.LEVELING.XPBoons"
+    }
   });
 
   // Disable Advancements
@@ -334,6 +390,24 @@ export function registerSystemSettings() {
     }
   });
 
+  // Compendium Browser source exclusion
+  game.settings.registerMenu("dnd5e", "packSourceConfiguration", {
+    name: "DND5E.CompendiumBrowser.Sources.Name",
+    label: "DND5E.CompendiumBrowser.Sources.Label",
+    hint: "DND5E.CompendiumBrowser.Sources.Hint",
+    icon: "fas fa-book-open-reader",
+    type: CompendiumBrowserSourceConfig,
+    restricted: true
+  });
+
+  game.settings.register("dnd5e", "packSourceConfiguration", {
+    name: "Pack Source Configuration",
+    scope: "world",
+    config: false,
+    type: Object,
+    default: {}
+  });
+
   // Primary Group
   game.settings.register("dnd5e", "primaryParty", {
     name: "Primary Party",
@@ -352,6 +426,19 @@ export function registerSystemSettings() {
     config: true,
     type: Boolean,
     default: true
+  });
+
+  // NPC sheet default skills
+  game.settings.register("dnd5e", "defaultSkills", {
+    name: "SETTINGS.DND5E.DEFAULTSKILLS.Name",
+    hint: "SETTINGS.DND5E.DEFAULTSKILLS.Hint",
+    type: new foundry.data.fields.SetField(
+      new foundry.data.fields.StringField({
+        choices: () => CONFIG.DND5E.skills
+      })
+    ),
+    default: [],
+    config: true
   });
 }
 
@@ -376,7 +463,7 @@ export function registerDeferredSettings() {
     name: "SETTINGS.DND5E.THEME.Name",
     hint: "SETTINGS.DND5E.THEME.Hint",
     scope: "client",
-    config: game.release.generation < 12,
+    config: false,
     default: "",
     type: String,
     choices: {
@@ -394,16 +481,13 @@ export function registerDeferredSettings() {
   });
 
   // Hook into core color scheme setting.
-  if ( game.release.generation > 11 ) {
-    const setting = game.settings.settings.get("core.colorScheme");
-    const { onChange } = setting ?? {};
-    if ( onChange ) setting.onChange = s => {
-      onChange();
-      setTheme(document.body, s);
-    };
-    setTheme(document.body, game.settings.get("core", "colorScheme"));
-  }
-  else setTheme(document.body, game.settings.get("dnd5e", "theme"));
+  const setting = game.settings.settings.get("core.colorScheme");
+  const { onChange } = setting ?? {};
+  if ( onChange ) setting.onChange = s => {
+    onChange();
+    setTheme(document.body, s);
+  };
+  setTheme(document.body, game.settings.get("core", "colorScheme"));
 }
 
 /* -------------------------------------------- */

@@ -98,7 +98,6 @@ h5 {
       font-weight: bold;
     }
     .form-fields {
-      .flexrow();
       > * {
         margin: 0 3px 0 0;
         &:last-child { margin-right: 0; }
@@ -846,8 +845,13 @@ h5 {
 /*  Token Heads-Up Display                   */
 /* ----------------------------------------- */
 
-#token-hud .status-effects .effect-control.active:not(.overlay) {
-  border: 1px solid green;
+#token-hud .status-effects {
+  width: max-content;
+  grid-template-columns: repeat(5, 25px);
+
+  .effect-control.active:not(.overlay) {
+    border: 1px solid green;
+  }
 }
 
 /* ----------------------------------------- */

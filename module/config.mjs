@@ -1,4 +1,6 @@
 import MapLocationControlIcon from "./canvas/map-location-control-icon.mjs";
+import { ConsumptionTargetData } from "./data/activity/fields/consumption-targets-field.mjs";
+import * as activities from "./documents/activity/_module.mjs";
 import * as advancement from "./documents/advancement/_module.mjs";
 import { preLocalize } from "./utils.mjs";
 
@@ -112,45 +114,12 @@ preLocalize("abilities", { keys: ["label", "abbreviation"] });
  * @enum {string}
  */
 DND5E.defaultAbilities = {
+  meleeAttack: "str",
+  rangedAttack: "dex",
   initiative: "dex",
   hitPoints: "con",
   concentration: "con"
 };
-
-Object.defineProperties(DND5E, {
-  hitPointsAbility: {
-    get: function() {
-      foundry.utils.logCompatibilityWarning(
-        "DND5E.hitPointsAbility has been deprecated and is now accessible through DND5E.defaultAbilities.hitPoints.",
-        { since: "DnD5e 3.1", until: "DnD5e 3.3" }
-      );
-      return DND5E.defaultAbilities.hitPoints;
-    },
-    set: function(value) {
-      foundry.utils.logCompatibilityWarning(
-        "DND5E.hitPointsAbility has been deprecated and is now accessible through DND5E.defaultAbilities.hitPoints.",
-        { since: "DnD5e 3.1", until: "DnD5e 3.3" }
-      );
-      DND5E.defaultAbilities.hitPoints = value;
-    }
-  },
-  initiativeAbility: {
-    get: function() {
-      foundry.utils.logCompatibilityWarning(
-        "DND5E.initiativeAbility has been deprecated and is now accessible through DND5E.defaultAbilities.initiative.",
-        { since: "DnD5e 3.1", until: "DnD5e 3.3" }
-      );
-      return DND5E.defaultAbilities.initiative;
-    },
-    set: function(value) {
-      foundry.utils.logCompatibilityWarning(
-        "DND5E.initiativeAbility has been deprecated and is now accessible through DND5E.defaultAbilities.initiative.",
-        { since: "DnD5e 3.1", until: "DnD5e 3.3" }
-      );
-      DND5E.defaultAbilities.initiative = value;
-    }
-  }
-});
 
 /* -------------------------------------------- */
 
@@ -342,6 +311,25 @@ DND5E.attunements = {
 preLocalize("attunements");
 
 /* -------------------------------------------- */
+/*  Weapon Details                              */
+/* -------------------------------------------- */
+
+/**
+ * The set of types which a weapon item can take.
+ * @enum {string}
+ */
+DND5E.weaponTypes = {
+  simpleM: "DND5E.WeaponSimpleM",
+  simpleR: "DND5E.WeaponSimpleR",
+  martialM: "DND5E.WeaponMartialM",
+  martialR: "DND5E.WeaponMartialR",
+  natural: "DND5E.WeaponNatural",
+  improv: "DND5E.WeaponImprov",
+  siege: "DND5E.WeaponSiege"
+};
+preLocalize("weaponTypes");
+
+/* -------------------------------------------- */
 
 /**
  * General weapon categories.
@@ -352,6 +340,48 @@ DND5E.weaponProficiencies = {
   mar: "DND5E.WeaponMartialProficiency"
 };
 preLocalize("weaponProficiencies");
+
+/* -------------------------------------------- */
+
+/**
+ * @typedef {object} WeaponMasterConfiguration
+ * @property {string} label        Localized label for the mastery
+ * @property {string} [reference]  Reference to a rule page describing this mastery.
+ */
+
+/**
+ * Weapon masteries.
+ * @enum {WeaponMasterConfiguration}
+ */
+DND5E.weaponMasteries = {
+  cleave: {
+    label: "DND5E.WEAPON.Mastery.Cleave"
+  },
+  graze: {
+    label: "DND5E.WEAPON.Mastery.Graze"
+  },
+  nick: {
+    label: "DND5E.WEAPON.Mastery.Nick"
+  },
+  push: {
+    label: "DND5E.WEAPON.Mastery.Push"
+  },
+  sap: {
+    label: "DND5E.WEAPON.Mastery.Sap"
+  },
+  slow: {
+    label: "DND5E.WEAPON.Mastery.Slow"
+  },
+  topple: {
+    label: "DND5E.WEAPON.Mastery.Topple"
+  },
+  vex: {
+    label: "DND5E.WEAPON.Mastery.Vex"
+  }
+};
+preLocalize("weaponMasteries", { key: "label", sort: true });
+
+/* -------------------------------------------- */
 
 /**
  * A mapping between `DND5E.weaponTypes` and `DND5E.weaponProficiencies` that
@@ -364,6 +394,31 @@ DND5E.weaponProficienciesMap = {
   martialM: "mar",
   martialR: "mar"
 };
+
+/* -------------------------------------------- */
+
+/**
+ * A mapping between `DND5E.weaponTypes` and `DND5E.attackClassifications`. Unlisted types are assumed to be
+ * of the "weapon" classification.
+ * @enum {string}
+ */
+DND5E.weaponClassificationMap = {};
+
+/* -------------------------------------------- */
+
+/**
+ * A mapping between `DND5E.weaponTypes` and `DND5E.attackTypes`.
+ * @enum {string}
+ */
+DND5E.weaponTypeMap = {
+  simpleM: "melee",
+  simpleR: "ranged",
+  martialM: "melee",
+  martialR: "ranged",
+  siege: "ranged"
+};
+
+/* -------------------------------------------- */
 
 /**
  * The basic weapon types in 5e. This enables specific weapon proficiencies or
@@ -424,6 +479,8 @@ DND5E.ammoIds = {
 };
 
 /* -------------------------------------------- */
+/*  Tool Details                                */
+/* -------------------------------------------- */
 
 /**
  * The categories into which Tool items can be grouped.
@@ -449,48 +506,182 @@ DND5E.toolProficiencies = {
 preLocalize("toolProficiencies", { sort: true });
 
 /**
+ * @typedef ToolConfiguration
+ * @property {string} ability  Default ability used for the tool.
+ * @property {string} id       UUID of reference tool or ID within pack defined by `DND5E.sourcePacks.ITEMS`.
+ */
+
+/**
+ * Configuration data for tools.
+ * @enum {ToolConfiguration}
+ */
+DND5E.tools = {
+  alchemist: {
+    ability: "int",
+    id: "SztwZhbhZeCqyAes"
+  },
+  bagpipes: {
+    ability: "cha",
+    id: "yxHi57T5mmVt0oDr"
+  },
+  brewer: {
+    ability: "int",
+    id: "Y9S75go1hLMXUD48"
+  },
+  calligrapher: {
+    ability: "dex",
+    id: "jhjo20QoiD5exf09"
+  },
+  card: {
+    ability: "wis",
+    id: "YwlHI3BVJapz4a3E"
+  },
+  carpenter: {
+    ability: "str",
+    id: "8NS6MSOdXtUqD7Ib"
+  },
+  cartographer: {
+    ability: "wis",
+    id: "fC0lFK8P4RuhpfaU"
+  },
+  chess: {
+    ability: "wis",
+    id: "23y8FvWKf9YLcnBL"
+  },
+  cobbler: {
+    ability: "dex",
+    id: "hM84pZnpCqKfi8XH"
+  },
+  cook: {
+    ability: "wis",
+    id: "Gflnp29aEv5Lc1ZM"
+  },
+  dice: {
+    ability: "wis",
+    id: "iBuTM09KD9IoM5L8"
+  },
+  disg: {
+    ability: "cha",
+    id: "IBhDAr7WkhWPYLVn"
+  },
+  drum: {
+    ability: "cha",
+    id: "69Dpr25pf4BjkHKb"
+  },
+  dulcimer: {
+    ability: "cha",
+    id: "NtdDkjmpdIMiX7I2"
+  },
+  flute: {
+    ability: "cha",
+    id: "eJOrPcAz9EcquyRQ"
+  },
+  forg: {
+    ability: "dex",
+    id: "cG3m4YlHfbQlLEOx"
+  },
+  glassblower: {
+    ability: "int",
+    id: "rTbVrNcwApnuTz5E"
+  },
+  herb: {
+    ability: "int",
+    id: "i89okN7GFTWHsvPy"
+  },
+  horn: {
+    ability: "cha",
+    id: "aa9KuBy4dst7WIW9"
+  },
+  jeweler: {
+    ability: "int",
+    id: "YfBwELTgPFHmQdHh"
+  },
+  leatherworker: {
+    ability: "dex",
+    id: "PUMfwyVUbtyxgYbD"
+  },
+  lute: {
+    ability: "cha",
+    id: "qBydtUUIkv520DT7"
+  },
+  lyre: {
+    ability: "cha",
+    id: "EwG1EtmbgR3bM68U"
+  },
+  mason: {
+    ability: "str",
+    id: "skUih6tBvcBbORzA"
+  },
+  navg: {
+    ability: "wis",
+    id: "YHCmjsiXxZ9UdUhU"
+  },
+  painter: {
+    ability: "wis",
+    id: "ccm5xlWhx74d6lsK"
+  },
+  panflute: {
+    ability: "cha",
+    id: "G5m5gYIx9VAUWC3J"
+  },
+  pois: {
+    ability: "int",
+    id: "il2GNi8C0DvGLL9P"
+  },
+  potter: {
+    ability: "int",
+    id: "hJS8yEVkqgJjwfWa"
+  },
+  shawm: {
+    ability: "cha",
+    id: "G3cqbejJpfB91VhP"
+  },
+  smith: {
+    ability: "str",
+    id: "KndVe2insuctjIaj"
+  },
+  thief: {
+    ability: "dex",
+    id: "woWZ1sO5IUVGzo58"
+  },
+  tinker: {
+    ability: "dex",
+    id: "0d08g1i5WXnNrCNA"
+  },
+  viol: {
+    ability: "cha",
+    id: "baoe3U5BfMMMxhCU"
+  },
+  weaver: {
+    ability: "dex",
+    id: "ap9prThUB2y9lDyj"
+  },
+  woodcarver: {
+    ability: "dex",
+    id: "xKErqkLo4ASYr5EP"
+  }
+};
+
+const _toolIds = Object.entries(DND5E.tools).reduce((obj, [k, { id }]) => {
+  obj[k] = id;
+  return obj;
+}, {});
+
+/**
  * The basic tool types in 5e. This enables specific tool proficiencies or
  * starting equipment provided by classes and backgrounds.
  * @enum {string}
  */
-DND5E.toolIds = {
-  alchemist: "SztwZhbhZeCqyAes",
-  bagpipes: "yxHi57T5mmVt0oDr",
-  brewer: "Y9S75go1hLMXUD48",
-  calligrapher: "jhjo20QoiD5exf09",
-  card: "YwlHI3BVJapz4a3E",
-  carpenter: "8NS6MSOdXtUqD7Ib",
-  cartographer: "fC0lFK8P4RuhpfaU",
-  chess: "23y8FvWKf9YLcnBL",
-  cobbler: "hM84pZnpCqKfi8XH",
-  cook: "Gflnp29aEv5Lc1ZM",
-  dice: "iBuTM09KD9IoM5L8",
-  disg: "IBhDAr7WkhWPYLVn",
-  drum: "69Dpr25pf4BjkHKb",
-  dulcimer: "NtdDkjmpdIMiX7I2",
-  flute: "eJOrPcAz9EcquyRQ",
-  forg: "cG3m4YlHfbQlLEOx",
-  glassblower: "rTbVrNcwApnuTz5E",
-  herb: "i89okN7GFTWHsvPy",
-  horn: "aa9KuBy4dst7WIW9",
-  jeweler: "YfBwELTgPFHmQdHh",
-  leatherworker: "PUMfwyVUbtyxgYbD",
-  lute: "qBydtUUIkv520DT7",
-  lyre: "EwG1EtmbgR3bM68U",
-  mason: "skUih6tBvcBbORzA",
-  navg: "YHCmjsiXxZ9UdUhU",
-  painter: "ccm5xlWhx74d6lsK",
-  panflute: "G5m5gYIx9VAUWC3J",
-  pois: "il2GNi8C0DvGLL9P",
-  potter: "hJS8yEVkqgJjwfWa",
-  shawm: "G3cqbejJpfB91VhP",
-  smith: "KndVe2insuctjIaj",
-  thief: "woWZ1sO5IUVGzo58",
-  tinker: "0d08g1i5WXnNrCNA",
-  viol: "baoe3U5BfMMMxhCU",
-  weaver: "ap9prThUB2y9lDyj",
-  woodcarver: "xKErqkLo4ASYr5EP"
-};
+DND5E.toolIds = new Proxy(_toolIds, {
+  set(target, prop, value) {
+    foundry.utils.logCompatibilityWarning(
+      "Appending to CONFIG.DND5E.toolIds is deprecated, use CONFIG.DND5E.tools instead.",
+      { since: "DnD5e 4.0", until: "DnD5e 4.2", once: true }
+    );
+    target[prop] ??= { ability: "int" };
+    target[prop].id = value;
+  }
+});
 
 /* -------------------------------------------- */
 
@@ -580,6 +771,72 @@ preLocalize("abilityActivationTypes");
 /* -------------------------------------------- */
 
 /**
+ * @typedef {ActivityActivationTypeConfig}
+ * @property {string} label            Localized label for the activation type.
+ * @property {string} [group]          Localized label for the presentational group.
+ * @property {boolean} [scalar=false]  Does this activation type have a numeric value attached?
+ */
+
+/**
+ * Configuration data for activation types on activities.
+ * @enum {ActivityActivationTypeConfig}
+ */
+DND5E.activityActivationTypes = {
+  action: {
+    label: "DND5E.Action",
+    group: "DND5E.ACTIVATION.Category.Standard"
+  },
+  bonus: {
+    label: "DND5E.BonusAction",
+    group: "DND5E.ACTIVATION.Category.Standard"
+  },
+  reaction: {
+    label: "DND5E.Reaction",
+    group: "DND5E.ACTIVATION.Category.Standard"
+  },
+  minute: {
+    label: "DND5E.TimeMinute",
+    group: "DND5E.ACTIVATION.Category.Time",
+    scalar: true
+  },
+  hour: {
+    label: "DND5E.TimeHour",
+    group: "DND5E.ACTIVATION.Category.Time",
+    scalar: true
+  },
+  day: {
+    label: "DND5E.TimeDay",
+    group: "DND5E.ACTIVATION.Category.Time",
+    scalar: true
+  },
+  legendary: {
+    label: "DND5E.LegendaryActionLabel",
+    group: "DND5E.ACTIVATION.Category.Monster",
+    scalar: true
+  },
+  mythic: {
+    label: "DND5E.MythicActionLabel",
+    group: "DND5E.ACTIVATION.Category.Monster",
+    scalar: true
+  },
+  lair: {
+    label: "DND5E.LairActionLabel",
+    group: "DND5E.ACTIVATION.Category.Monster"
+  },
+  crew: {
+    label: "DND5E.VehicleCrewAction",
+    group: "DND5E.ACTIVATION.Category.Vehicle",
+    scalar: true
+  },
+  special: {
+    label: "DND5E.Special"
+  }
+};
+preLocalize("activityActivationTypes", { key: "label" });
+
+/* -------------------------------------------- */
+
+/**
  * Different things that an ability can consume upon use.
  * @enum {string}
  */
@@ -591,6 +848,87 @@ DND5E.abilityConsumptionTypes = {
   charges: "DND5E.ConsumeCharges"
 };
 preLocalize("abilityConsumptionTypes", { sort: true });
+
+/* -------------------------------------------- */
+
+/**
+ * @typedef {object} ActivityConsumptionTargetConfig
+ * @property {string} label                                     Localized label for the target type.
+ * @property {ConsumptionConsumeFunction} consume               Function used to consume according to this type.
+ * @property {ConsumptionLabelsFunction} consumptionLabels      Function used to generate a hint of consumption amount.
+ * @property {{value: string, label: string}[]} [scalingModes]  Additional scaling modes for this consumption type in
+ *                                                              addition to the default "amount" scaling.
+ * @property {boolean} [targetRequiresEmbedded]                 Use text input rather than select when not embedded.
+ * @property {ConsumptionValidTargetsFunction} [validTargets]   Function for creating an array of consumption targets.
+ */
+
+/**
+ * @callback ConsumptionConsumeFunction
+ * @this {ConsumptionTargetData}
+ * @param {ActivityUseConfiguration} config  Configuration data for the activity usage.
+ * @param {ActivityUsageUpdates} updates     Updates to be performed.
+ * @throws ConsumptionError
+ */
+
+/**
+ * @callback ConsumptionLabelsFunction
+ * @this {ConsumptionTargetData}
+ * @param {ActivityUseConfiguration} config    Configuration data for the activity usage.
+ * @returns {{ label: string, hint: string }}  Label and hint text.
+ */
+
+/**
+ * @callback ConsumptionValidTargetsFunction
+ * @this {ConsumptionTargetData}
+ * @returns {FormSelectOption[]}
+ */
+
+/**
+ * Configuration information for different consumption targets.
+ * @enum {ActivityConsumptionTargetConfig}
+ */
+DND5E.activityConsumptionTypes = {
+  activityUses: {
+    label: "DND5E.CONSUMPTION.Type.ActivityUses.Label",
+    consume: ConsumptionTargetData.consumeActivityUses,
+    consumptionLabels: ConsumptionTargetData.consumptionLabelsActivityUses
+  },
+  itemUses: {
+    label: "DND5E.CONSUMPTION.Type.ItemUses.Label",
+    consume: ConsumptionTargetData.consumeItemUses,
+    consumptionLabels: ConsumptionTargetData.consumptionLabelsItemUses,
+    targetRequiresEmbedded: true,
+    validTargets: ConsumptionTargetData.validItemUsesTargets
+  },
+  material: {
+    label: "DND5E.CONSUMPTION.Type.Material.Label",
+    consume: ConsumptionTargetData.consumeMaterial,
+    consumptionLabels: ConsumptionTargetData.consumptionLabelsMaterial,
+    targetRequiresEmbedded: true,
+    validTargets: ConsumptionTargetData.validMaterialTargets
+  },
+  hitDice: {
+    label: "DND5E.CONSUMPTION.Type.HitDice.Label",
+    consume: ConsumptionTargetData.consumeHitDice,
+    consumptionLabels: ConsumptionTargetData.consumptionLabelsHitDice,
+    validTargets: ConsumptionTargetData.validHitDiceTargets
+  },
+  spellSlots: {
+    label: "DND5E.CONSUMPTION.Type.SpellSlots.Label",
+    consume: ConsumptionTargetData.consumeSpellSlots,
+    consumptionLabels: ConsumptionTargetData.consumptionLabelsSpellSlots,
+    scalingModes: [{ value: "level", label: "DND5E.CONSUMPTION.Scaling.SlotLevel" }],
+    validTargets: ConsumptionTargetData.validSpellSlotsTargets
+  },
+  attribute: {
+    label: "DND5E.CONSUMPTION.Type.Attribute.Label",
+    consume: ConsumptionTargetData.consumeAttribute,
+    consumptionLabels: ConsumptionTargetData.consumptionLabelsAttribute,
+    targetRequiresEmbedded: true,
+    validTargets: ConsumptionTargetData.validAttributeTargets
+  }
+};
+preLocalize("activityConsumptionTypes", { key: "label" });
 
 /* -------------------------------------------- */
 
@@ -792,7 +1130,7 @@ DND5E.creatureTypes = {
   humanoid: {
     label: "DND5E.CreatureHumanoid",
     plural: "DND5E.CreatureHumanoidPl",
-    icon: "icons/magic/unholy/strike-body-explode-disintegrate.webp",
+    icon: "icons/environment/people/group.webp",
     reference: "Compendium.dnd5e.rules.JournalEntry.NizgRXLNUqtdlC1s.JournalEntryPage.iFzQs4AenN8ALRvw"
   },
   monstrosity: {
@@ -875,19 +1213,6 @@ preLocalize("itemRarity");
 /* -------------------------------------------- */
 
 /**
- * The limited use periods that support a recovery formula.
- * @deprecated since DnD5e 3.1, available until DnD5e 3.3
- * @enum {string}
- */
-DND5E.limitedUseFormulaPeriods = {
-  charges: "DND5E.Charges",
-  dawn: "DND5E.Dawn",
-  dusk: "DND5E.Dusk"
-};
-
-/* -------------------------------------------- */
-
-/**
  * Configuration data for limited use periods.
  *
  * @typedef {object} LimitedUsePeriodConfiguration
@@ -901,13 +1226,13 @@ DND5E.limitedUseFormulaPeriods = {
  * @enum {LimitedUsePeriodConfiguration}
  */
 DND5E.limitedUsePeriods = {
-  sr: {
-    label: "DND5E.UsesPeriods.Sr",
-    abbreviation: "DND5E.UsesPeriods.SrAbbreviation"
-  },
   lr: {
     label: "DND5E.UsesPeriods.Lr",
     abbreviation: "DND5E.UsesPeriods.LrAbbreviation"
+  },
+  sr: {
+    label: "DND5E.UsesPeriods.Sr",
+    abbreviation: "DND5E.UsesPeriods.SrAbbreviation"
   },
   day: {
     label: "DND5E.UsesPeriods.Day",
@@ -916,7 +1241,8 @@ DND5E.limitedUsePeriods = {
   charges: {
     label: "DND5E.UsesPeriods.Charges",
     abbreviation: "DND5E.UsesPeriods.ChargesAbbreviation",
-    formula: true
+    formula: true,
+    deprecated: true
   },
   dawn: {
     label: "DND5E.UsesPeriods.Dawn",
@@ -930,7 +1256,6 @@ DND5E.limitedUsePeriods = {
   }
 };
 preLocalize("limitedUsePeriods", { keys: ["label", "abbreviation"] });
-patchConfig("limitedUsePeriods", "label", { since: "DnD5e 3.1", until: "DnD5e 3.3" });
 
 /* -------------------------------------------- */
 
@@ -1094,6 +1419,10 @@ DND5E.armorClasses = {
     label: "DND5E.ArmorClassUnarmoredBarbarian",
     formula: "10 + @abilities.dex.mod + @abilities.con.mod"
   },
+  unarmoredBard: {
+    label: "DND5E.ArmorClassUnarmoredBard",
+    formula: "10 + @abilities.dex.mod + @abilities.cha.mod"
+  },
   custom: {
     label: "DND5E.ArmorClassCustom"
   }
@@ -1116,40 +1445,41 @@ preLocalize("armorClasses", { key: "label" });
  */
 DND5E.consumableTypes = {
   ammo: {
-    label: "DND5E.ConsumableAmmo",
+    label: "DND5E.CONSUMABLE.Type.Ammunition.Label",
     subtypes: {
-      arrow: "DND5E.ConsumableAmmoArrow",
-      blowgunNeedle: "DND5E.ConsumableAmmoBlowgunNeedle",
-      crossbowBolt: "DND5E.ConsumableAmmoCrossbowBolt",
-      slingBullet: "DND5E.ConsumableAmmoSlingBullet"
+      arrow: "DND5E.CONSUMABLE.Type.Ammunition.Arrow",
+      crossbowBolt: "DND5E.CONSUMABLE.Type.Ammunition.Bolt",
+      firearmBullet: "DND5E.CONSUMABLE.Type.Ammunition.BulletFirearm",
+      slingBullet: "DND5E.CONSUMABLE.Type.Ammunition.BulletSling",
+      blowgunNeedle: "DND5E.CONSUMABLE.Type.Ammunition.Needle"
     }
   },
   potion: {
-    label: "DND5E.ConsumablePotion"
+    label: "DND5E.CONSUMABLE.Type.Potion.Label"
   },
   poison: {
-    label: "DND5E.ConsumablePoison",
+    label: "DND5E.CONSUMABLE.Type.Poison.Label",
     subtypes: {
-      contact: "DND5E.ConsumablePoisonContact",
-      ingested: "DND5E.ConsumablePoisonIngested",
-      inhaled: "DND5E.ConsumablePoisonInhaled",
-      injury: "DND5E.ConsumablePoisonInjury"
+      contact: "DND5E.CONSUMABLE.Type.Poison.Contact",
+      ingested: "DND5E.CONSUMABLE.Type.Poison.Ingested",
+      inhaled: "DND5E.CONSUMABLE.Type.Poison.Inhaled",
+      injury: "DND5E.CONSUMABLE.Type.Poison.Injury"
     }
   },
   food: {
-    label: "DND5E.ConsumableFood"
+    label: "DND5E.CONSUMABLE.Type.Food.Label"
   },
   scroll: {
-    label: "DND5E.ConsumableScroll"
+    label: "DND5E.CONSUMABLE.Type.Scroll.Label"
   },
   wand: {
-    label: "DND5E.ConsumableWand"
+    label: "DND5E.CONSUMABLE.Type.Wand.Label"
   },
   rod: {
-    label: "DND5E.ConsumableRod"
+    label: "DND5E.CONSUMABLE.Type.Rod.Label"
   },
   trinket: {
-    label: "DND5E.ConsumableTrinket"
+    label: "DND5E.CONSUMABLE.Type.Trinket.Label"
   }
 };
 preLocalize("consumableTypes", { key: "label", sort: true });
@@ -1263,17 +1593,23 @@ DND5E.featureTypes = {
     label: "DND5E.Feature.Monster"
   },
   race: {
-    label: "DND5E.Feature.Race"
+    label: "DND5E.Feature.Species"
   },
   enchantment: {
-    label: "DND5E.Enchantment.Label",
+    label: "DND5E.ENCHANTMENT.Label",
     subtypes: {
       artificerInfusion: "DND5E.Feature.Class.ArtificerInfusion",
       rune: "DND5E.Feature.Class.Rune"
     }
   },
   feat: {
-    label: "DND5E.Feature.Feat"
+    label: "DND5E.Feature.Feat.Label",
+    subtypes: {
+      general: "DND5E.Feature.Feat.General",
+      origin: "DND5E.Feature.Feat.Origin",
+      fightingStyle: "DND5E.Feature.Feat.FightingStyle",
+      epicBoon: "DND5E.Feature.Feat.EpicBoon"
+    }
   },
   supernaturalGift: {
     label: "DND5E.Feature.SupernaturalGift.Label",
@@ -1287,6 +1623,7 @@ DND5E.featureTypes = {
 preLocalize("featureTypes", { key: "label" });
 preLocalize("featureTypes.class.subtypes", { sort: true });
 preLocalize("featureTypes.enchantment.subtypes", { sort: true });
+preLocalize("featureTypes.feat.subtypes", { sort: true });
 preLocalize("featureTypes.supernaturalGift.subtypes", { sort: true });
 
 /* -------------------------------------------- */
@@ -1416,12 +1753,10 @@ DND5E.validProperties = {
     "weightlessContents"
   ]),
   equipment: new Set([
-    "concentration",
     "mgc",
     "stealthDisadvantage"
   ]),
   feat: new Set([
-    "concentration",
     "mgc"
   ]),
   loot: new Set([
@@ -1454,7 +1789,6 @@ DND5E.validProperties = {
     "ritual"
   ]),
   tool: new Set([
-    "concentration",
     "mgc"
   ])
 };
@@ -1541,7 +1875,31 @@ DND5E.currencies = {
 preLocalize("currencies", { keys: ["label", "abbreviation"] });
 
 /* -------------------------------------------- */
-/*  Damage Types                                */
+/*  Damage                                      */
+/* -------------------------------------------- */
+
+/**
+ * Standard dice spread available for things like damage.
+ * @type {number[]}
+ */
+DND5E.dieSteps = [4, 6, 8, 10, 12, 20, 100];
+
+/* -------------------------------------------- */
+
+/**
+ * Methods by which damage scales relative to the overall scaling increase.
+ * @enum {{ label: string }}
+ */
+DND5E.damageScalingModes = {
+  whole: {
+    label: "DND5E.DAMAGE.Scaling.Whole"
+  },
+  half: {
+    label: "DND5E.DAMAGE.Scaling.Half"
+  }
+};
+preLocalize("damageScalingModes", { key: "label" });
+
 /* -------------------------------------------- */
 
 /**
@@ -1889,6 +2247,10 @@ preLocalize("individualTargetTypes");
  * @property {string} label        Localized label for this type.
  * @property {string} template     Type of `MeasuredTemplate` create for this target type.
  * @property {string} [reference]  Reference to a rule page describing this area of effect.
+ * @property {string[]} [sizes]    List of available sizes for this template. Options are chosen from the list:
+ *                                 "radius", "width", "height", "length", "thickness". No more than 3 dimensions may
+ *                                 be specified.
+ * @property {boolean} [standard]  Is this a standard area of effect as defined explicitly by the rules?
  */
 
 /**
@@ -1896,45 +2258,75 @@ preLocalize("individualTargetTypes");
  * @enum {AreaTargetDefinition}
  */
 DND5E.areaTargetTypes = {
-  radius: {
-    label: "DND5E.TargetRadius",
-    template: "circle"
-  },
-  sphere: {
-    label: "DND5E.TargetSphere",
+  circle: {
+    label: "DND5E.TargetCircle",
     template: "circle",
-    reference: "Compendium.dnd5e.rules.JournalEntry.NizgRXLNUqtdlC1s.JournalEntryPage.npdEWb2egUPnB5Fa"
-  },
-  cylinder: {
-    label: "DND5E.TargetCylinder",
-    template: "circle",
-    reference: "Compendium.dnd5e.rules.JournalEntry.NizgRXLNUqtdlC1s.JournalEntryPage.jZFp4R7tXsIqkiG3"
+    sizes: ["radius"]
   },
   cone: {
     label: "DND5E.TargetCone",
     template: "cone",
-    reference: "Compendium.dnd5e.rules.JournalEntry.NizgRXLNUqtdlC1s.JournalEntryPage.DqqAOr5JnX71OCOw"
-  },
-  square: {
-    label: "DND5E.TargetSquare",
-    template: "rect"
+    reference: "Compendium.dnd5e.rules.JournalEntry.NizgRXLNUqtdlC1s.JournalEntryPage.DqqAOr5JnX71OCOw",
+    sizes: ["length"],
+    standard: true
   },
   cube: {
     label: "DND5E.TargetCube",
     template: "rect",
-    reference: "Compendium.dnd5e.rules.JournalEntry.NizgRXLNUqtdlC1s.JournalEntryPage.dRfDIwuaHmUQ06uA"
+    reference: "Compendium.dnd5e.rules.JournalEntry.NizgRXLNUqtdlC1s.JournalEntryPage.dRfDIwuaHmUQ06uA",
+    sizes: ["width"],
+    standard: true
+  },
+  cylinder: {
+    label: "DND5E.TargetCylinder",
+    template: "circle",
+    reference: "Compendium.dnd5e.rules.JournalEntry.NizgRXLNUqtdlC1s.JournalEntryPage.jZFp4R7tXsIqkiG3",
+    sizes: ["radius", "height"],
+    standard: true
   },
   line: {
     label: "DND5E.TargetLine",
     template: "ray",
-    reference: "Compendium.dnd5e.rules.JournalEntry.NizgRXLNUqtdlC1s.JournalEntryPage.6DOoBgg7okm9gBc6"
+    reference: "Compendium.dnd5e.rules.JournalEntry.NizgRXLNUqtdlC1s.JournalEntryPage.6DOoBgg7okm9gBc6",
+    sizes: ["length", "width"],
+    standard: true
+  },
+  radius: {
+    label: "DND5E.TargetRadius",
+    template: "circle",
+    standard: true
+  },
+  sphere: {
+    label: "DND5E.TargetSphere",
+    template: "circle",
+    reference: "Compendium.dnd5e.rules.JournalEntry.NizgRXLNUqtdlC1s.JournalEntryPage.npdEWb2egUPnB5Fa",
+    sizes: ["radius"],
+    standard: true
+  },
+  square: {
+    label: "DND5E.TargetSquare",
+    template: "rect",
+    sizes: ["width"]
   },
   wall: {
     label: "DND5E.TargetWall",
-    template: "ray"
+    template: "ray",
+    sizes: ["length", "thickness", "height"]
   }
 };
 preLocalize("areaTargetTypes", { key: "label", sort: true });
+
+Object.defineProperty(DND5E, "areaTargetOptions", {
+  get() {
+    const { primary, secondary } = Object.entries(this.areaTargetTypes).reduce((obj, [value, data]) => {
+      const entry = { value, label: data.label };
+      if ( data.standard ) obj.primary.push(entry);
+      else obj.secondary.push(entry);
+      return obj;
+    }, { primary: [], secondary: [] });
+    return [{ value: "", label: "" }, ...primary, { rule: true }, ...secondary];
+  }
+});
 
 /* -------------------------------------------- */
 
@@ -1962,7 +2354,13 @@ DND5E.hitDieTypes = ["d4", "d6", "d8", "d10", "d12"];
  * Configuration data for rest types.
  *
  * @typedef {object} RestConfiguration
- * @property {Record<string, number>} duration  Duration of different rest variants in minutes.
+ * @property {Record<string, number>} duration    Duration of different rest variants in minutes.
+ * @property {boolean} recoverHitDice             Should hit dice be recovered during this rest?
+ * @property {boolean} recoverHitPoints           Should hit points be recovered during this rest?
+ * @property {string[]} recoverPeriods            What recovery periods should be applied when this rest is taken. The
+ *                                                ordering of the periods determines which is applied if more than one
+ *                                                recovery profile is found.
+ * @property {Set<string>} recoverSpellSlotTypes  Types of spellcasting slots to recover during this rest.
  */
 
 /**
@@ -1975,14 +2373,20 @@ DND5E.restTypes = {
       normal: 60,
       gritty: 480,
       epic: 1
-    }
+    },
+    recoverPeriods: ["sr"],
+    recoverSpellSlotTypes: new Set(["pact"])
   },
   long: {
     duration: {
       normal: 480,
       gritty: 10080,
       epic: 60
-    }
+    },
+    recoverHitDice: true,
+    recoverHitPoints: true,
+    recoverPeriods: ["lr", "sr"],
+    recoverSpellSlotTypes: new Set(["leveled", "pact"])
   }
 };
 
@@ -1999,6 +2403,43 @@ DND5E.senses = {
   truesight: "DND5E.SenseTruesight"
 };
 preLocalize("senses", { sort: true });
+
+/* -------------------------------------------- */
+/*  Attacks                                     */
+/* -------------------------------------------- */
+
+/**
+ * Classifications of attacks based on what is performing them.
+ * @enum {{ label: string }}
+ */
+DND5E.attackClassifications = {
+  weapon: {
+    label: "DND5E.ATTACK.Classification.Weapon"
+  },
+  spell: {
+    label: "DND5E.ATTACK.Classification.Spell"
+  },
+  unarmed: {
+    label: "DND5E.ATTACK.Classification.Unarmed"
+  }
+};
+preLocalize("attackClassifications", { key: "label" });
+
+/* -------------------------------------------- */
+
+/**
+ * Types of attacks based on range.
+ * @enum {{ label: string }}
+ */
+DND5E.attackTypes = Object.seal({
+  melee: {
+    label: "DND5E.ATTACK.Type.Melee"
+  },
+  ranged: {
+    label: "DND5E.ATTACK.Type.Ranged"
+  }
+});
+preLocalize("attackTypes", { key: "label" });
 
 /* -------------------------------------------- */
 /*  Spellcasting                                */
@@ -2105,16 +2546,6 @@ DND5E.spellPreparationModes = {
   }
 };
 preLocalize("spellPreparationModes", { key: "label" });
-patchConfig("spellPreparationModes", "label", { since: "DnD5e 3.1", until: "DnD5e 3.3" });
-
-/* -------------------------------------------- */
-
-/**
- * Subset of `DND5E.spellPreparationModes` that consume spell slots.
- * @deprecated since DnD5e 3.1, available until DnD5e 3.3
- * @type {string[]}
- */
-DND5E.spellUpcastModes = ["always", "pact", "prepared"];
 
 /* -------------------------------------------- */
 
@@ -2152,7 +2583,8 @@ DND5E.spellcastingTypes = {
       },
       half: {
         label: "DND5E.SpellProgHalf",
-        divisor: 2
+        divisor: 2,
+        roundUp: true
       },
       third: {
         label: "DND5E.SpellProgThird",
@@ -2222,74 +2654,6 @@ DND5E.spellScalingModes = {
   level: "DND5E.SpellLevel"
 };
 preLocalize("spellScalingModes", { sort: true });
-
-/* -------------------------------------------- */
-
-/**
- * Configuration data for spell components.
- *
- * @typedef {object} SpellComponentConfiguration
- * @property {string} label         Localized label.
- * @property {string} abbr          Localized abbreviation.
- * @property {string} [reference]   Reference to a rule page describing this component.
- */
-
-/**
- * Types of components that can be required when casting a spell.
- * @deprecated since DnD5e 3.0, available until DnD5e 3.3
- * @enum {SpellComponentConfiguration}
- */
-DND5E.spellComponents = {
-  vocal: {
-    label: "DND5E.ComponentVerbal",
-    abbr: "DND5E.ComponentVerbalAbbr",
-    reference: "Compendium.dnd5e.rules.JournalEntry.NizgRXLNUqtdlC1s.JournalEntryPage.6UXTNWMCQ0nSlwwx"
-  },
-  somatic: {
-    label: "DND5E.ComponentSomatic",
-    abbr: "DND5E.ComponentSomaticAbbr",
-    reference: "Compendium.dnd5e.rules.JournalEntry.NizgRXLNUqtdlC1s.JournalEntryPage.qwUNgUNilEmZkSC9"
-  },
-  material: {
-    label: "DND5E.ComponentMaterial",
-    abbr: "DND5E.ComponentMaterialAbbr",
-    reference: "Compendium.dnd5e.rules.JournalEntry.NizgRXLNUqtdlC1s.JournalEntryPage.AeH5eDS4YeM9RETC"
-  }
-};
-preLocalize("spellComponents", { keys: ["label", "abbr"] });
-
-/* -------------------------------------------- */
-
-/**
- * Configuration data for spell tags.
- *
- * @typedef {object} SpellTagConfiguration
- * @property {string} label         Localized label.
- * @property {string} abbr          Localized abbreviation.
- * @property {string} icon          Icon representing this tag.
- * @property {string} [reference]   Reference to a rule page describing this tag.
- */
-
-/**
- * Supplementary rules keywords that inform a spell's use.
- * @deprecated since DnD5e 3.0, available until DnD5e 3.3
- * @enum {SpellTagConfiguration}
- */
-DND5E.spellTags = {
-  concentration: {
-    label: "DND5E.Concentration",
-    abbr: "DND5E.ConcentrationAbbr",
-    icon: "systems/dnd5e/icons/svg/statuses/concentrating.svg",
-    reference: "Compendium.dnd5e.rules.JournalEntry.NizgRXLNUqtdlC1s.JournalEntryPage.ow58p27ctAnr4VPH"
-  },
-  ritual: {
-    label: "DND5E.Ritual",
-    abbr: "DND5E.RitualAbbr",
-    icon: "systems/dnd5e/icons/svg/items/spell.svg",
-    reference: "Compendium.dnd5e.rules.JournalEntry.NizgRXLNUqtdlC1s.JournalEntryPage.FjWqT5iyJ89kohdA"
-  }
-};
-preLocalize("spellTags", { keys: ["label", "abbr"] });
 
 /* -------------------------------------------- */
 
@@ -2366,10 +2730,10 @@ preLocalize("spellSchools", { key: "label", sort: true });
  * @enum {string}
  */
 DND5E.spellListTypes = {
-  class: "ITEM.TypeClass",
-  subclass: "ITEM.TypeSubclass",
-  background: "ITEM.TypeBackground",
-  race: "ITEM.TypeRace",
+  class: "TYPES.Item.class",
+  subclass: "TYPES.Item.subclass",
+  background: "TYPES.Item.background",
+  race: "TYPES.Item.race",
   other: "JOURNALENTRYPAGE.DND5E.SpellList.Type.Other"
 };
 preLocalize("spellListTypes");
@@ -2394,23 +2758,25 @@ DND5E.spellScrollIds = {
 };
 
 /* -------------------------------------------- */
-/*  Weapon Details                              */
-/* -------------------------------------------- */
 
 /**
- * The set of types which a weapon item can take.
- * @enum {string}
+ * @typedef {object} SpellScrollValues
+ * @property {number} bonus  Attack to hit bonus.
+ * @property {number} dc     Saving throw DC.
  */
-DND5E.weaponTypes = {
-  simpleM: "DND5E.WeaponSimpleM",
-  simpleR: "DND5E.WeaponSimpleR",
-  martialM: "DND5E.WeaponMartialM",
-  martialR: "DND5E.WeaponMartialR",
-  natural: "DND5E.WeaponNatural",
-  improv: "DND5E.WeaponImprov",
-  siege: "DND5E.WeaponSiege"
+
+/**
+ * Spell scroll save DCs and attack bonus values based on spell level. If matching level isn't found,
+ * then the nearest level lower than it will be selected.
+ * @enum {SpellScrollValues}
+ */
+DND5E.spellScrollValues = {
+  0: { dc: 13, bonus: 5 },
+  3: { dc: 15, bonus: 7 },
+  5: { dc: 17, bonus: 9 },
+  7: { dc: 18, bonus: 10 },
+  9: { dc: 19, bonus: 11 }
 };
-preLocalize("weaponTypes");
 
 /* -------------------------------------------- */
 
@@ -2444,7 +2810,10 @@ DND5E.polymorphSettings = {
   keepItems: "DND5E.PolymorphKeepItems",
   keepBio: "DND5E.PolymorphKeepBio",
   keepVision: "DND5E.PolymorphKeepVision",
-  keepSelf: "DND5E.PolymorphKeepSelf"
+  keepSelf: "DND5E.PolymorphKeepSelf",
+  keepType: "DND5E.PolymorphKeepType",
+  keepHP: "DND5E.PolymorphKeepHP",
+  addTemp: "DND5E.PolymorphAddTemp"
 };
 preLocalize("polymorphSettings", { sort: true });
 
@@ -2476,27 +2845,35 @@ DND5E.transformationPresets = {
       keepBio: true,
       keepClass: true,
       keepFeats: true,
+      keepHP: true,
       keepMental: true,
+      keepType: true,
       mergeSaves: true,
       mergeSkills: true,
-      keepEquipmentAE: false
+      keepEquipmentAE: false,
+      preset: "wildshape"
     }
   },
   polymorph: {
     icon: '<i class="fas fa-pastafarianism"></i>',
     label: "DND5E.Polymorph",
     options: {
+      addTemp: true,
+      keepHP: true,
+      keepType: true,
       keepEquipmentAE: false,
       keepClassAE: false,
       keepFeatAE: false,
-      keepBackgroundAE: false
+      keepBackgroundAE: false,
+      preset: "polymorph"
     }
   },
   polymorphSelf: {
     icon: '<i class="fas fa-eye"></i>',
     label: "DND5E.PolymorphSelf",
     options: {
-      keepSelf: true
+      keepSelf: true,
+      preset: "polymorphSelf"
     }
   }
 };
@@ -2571,10 +2948,14 @@ DND5E.consumableResources = [
 
 /**
  * @typedef {object} _StatusEffectConfig5e
- * @property {string} icon            Icon used to represent the condition on the token.
- * @property {string} [reference]     UUID of a journal entry with details on this condition.
- * @property {string} [special]       Set this condition as a special status effect under this name.
- * @property {string[]} [riders]      Additional conditions, by id, to apply as part of this condition.
+ * @property {string} icon              Icon used to represent the condition on the token.
+ * @property {number} [order]           Order status to the start of the token HUD, rather than alphabetically.
+ * @property {string} [reference]       UUID of a journal entry with details on this condition.
+ * @property {string} [special]         Set this condition as a special status effect under this name.
+ * @property {string[]} [riders]        Additional conditions, by id, to apply as part of this condition.
+ * @property {string} [exclusiveGroup]  Any status effects with the same group will not be able to be applied at the
+ *                                      same time through the token HUD (multiple statuses applied through other
+ *                                      effects can still coexist).
  */
 
 /**
@@ -2588,6 +2969,8 @@ DND5E.consumableResources = [
  * @property {boolean} [pseudo]    Is this a pseudo-condition, i.e. one that does not appear in the conditions appendix
  *                                 but acts as a status effect?
  * @property {number} [levels]     The number of levels of exhaustion an actor can obtain.
+ * @property {{ rolls: number, speed: number }} [reduction]  Amount D20 Tests & Speed are reduced per exhaustion level
+ *                                                           when using the modern rules.
  */
 
 /**
@@ -2611,6 +2994,11 @@ DND5E.conditionTypes = {
     reference: "Compendium.dnd5e.rules.JournalEntry.w7eitkpD7QQTB6j0.JournalEntryPage.0b8N4FymGGfbZGpJ",
     special: "BLIND"
   },
+  burning: {
+    label: "EFFECT.DND5E.StatusBurning",
+    icon: "systems/dnd5e/icons/svg/statuses/burning.svg",
+    pseudo: true
+  },
   charmed: {
     label: "DND5E.ConCharmed",
     icon: "systems/dnd5e/icons/svg/statuses/charmed.svg",
@@ -2619,6 +3007,11 @@ DND5E.conditionTypes = {
   cursed: {
     label: "EFFECT.DND5E.StatusCursed",
     icon: "systems/dnd5e/icons/svg/statuses/cursed.svg",
+    pseudo: true
+  },
+  dehydration: {
+    label: "EFFECT.DND5E.StatusDehydration",
+    icon: "systems/dnd5e/icons/svg/statuses/dehydration.svg",
     pseudo: true
   },
   deafened: {
@@ -2636,7 +3029,13 @@ DND5E.conditionTypes = {
     label: "DND5E.ConExhaustion",
     icon: "systems/dnd5e/icons/svg/statuses/exhaustion.svg",
     reference: "Compendium.dnd5e.rules.JournalEntry.w7eitkpD7QQTB6j0.JournalEntryPage.cspWveykstnu3Zcv",
-    levels: 6
+    levels: 6,
+    reduction: { rolls: 2, speed: 5 }
+  },
+  falling: {
+    label: "EFFECT.DND5E.StatusFalling",
+    icon: "systems/dnd5e/icons/svg/statuses/falling.svg",
+    pseudo: true
   },
   frightened: {
     label: "DND5E.ConFrightened",
@@ -2657,6 +3056,11 @@ DND5E.conditionTypes = {
     label: "DND5E.ConInvisible",
     icon: "systems/dnd5e/icons/svg/statuses/invisible.svg",
     reference: "Compendium.dnd5e.rules.JournalEntry.w7eitkpD7QQTB6j0.JournalEntryPage.3UU5GCTVeRDbZy9u"
+  },
+  malnutrition: {
+    label: "EFFECT.DND5E.StatusMalnutrition",
+    icon: "systems/dnd5e/icons/svg/statuses/malnutrition.svg",
+    pseudo: true
   },
   paralyzed: {
     label: "DND5E.ConParalyzed",
@@ -2695,6 +3099,11 @@ DND5E.conditionTypes = {
     icon: "systems/dnd5e/icons/svg/statuses/stunned.svg",
     reference: "Compendium.dnd5e.rules.JournalEntry.w7eitkpD7QQTB6j0.JournalEntryPage.ZyZMUwA2rboh4ObS",
     statuses: ["incapacitated"]
+  },
+  suffocation: {
+    label: "EFFECT.DND5E.StatusSuffocation",
+    icon: "systems/dnd5e/icons/svg/statuses/suffocation.svg",
+    pseudo: true
   },
   surprised: {
     label: "EFFECT.DND5E.StatusSurprised",
@@ -2736,7 +3145,7 @@ DND5E.conditionEffects = {
 /**
  * Extra status effects not specified in `conditionTypes`. If the ID matches a core-provided effect, then this
  * data will be merged into the core data.
- * @enum {Omit<StatusEffectConfig5e, "img"> & {icon: string}}
+ * @enum {Omit<StatusEffectConfig5e, "img"> & { icon: string }}
  */
 DND5E.statusEffects = {
   burrowing: {
@@ -2749,10 +3158,29 @@ DND5E.statusEffects = {
     icon: "systems/dnd5e/icons/svg/statuses/concentrating.svg",
     special: "CONCENTRATING"
   },
+  coverHalf: {
+    name: "EFFECT.DND5E.StatusHalfCover",
+    icon: "systems/dnd5e/icons/svg/statuses/cover-half.svg",
+    order: 2,
+    exclusiveGroup: "cover"
+  },
+  coverThreeQuarters: {
+    name: "EFFECT.DND5E.StatusThreeQuartersCover",
+    icon: "systems/dnd5e/icons/svg/statuses/cover-three-quarters.svg",
+    order: 3,
+    exclusiveGroup: "cover"
+  },
+  coverTotal: {
+    name: "EFFECT.DND5E.StatusTotalCover",
+    icon: "systems/dnd5e/icons/svg/statuses/cover-total.svg",
+    order: 4,
+    exclusiveGroup: "cover"
+  },
   dead: {
     name: "EFFECT.DND5E.StatusDead",
     icon: "systems/dnd5e/icons/svg/statuses/dead.svg",
-    special: "DEFEATED"
+    special: "DEFEATED",
+    order: 1
   },
   dodging: {
     name: "EFFECT.DND5E.StatusDodging",
@@ -2789,6 +3217,18 @@ DND5E.statusEffects = {
     name: "EFFECT.DND5E.StatusStable",
     icon: "systems/dnd5e/icons/svg/statuses/stable.svg"
   }
+};
+
+/* -------------------------------------------- */
+
+/**
+ * Configuration for the special bloodied status effect.
+ * @type {{ name: string, icon: string, threshold: number }}
+ */
+DND5E.bloodied = {
+  name: "EFFECT.DND5E.StatusBloodied",
+  icon: "systems/dnd5e/icons/svg/statuses/bloodied.svg",
+  threshold: .5
 };
 
 /* -------------------------------------------- */
@@ -2844,7 +3284,6 @@ preLocalize("languages", { key: "label" });
 preLocalize("languages.standard.children", { key: "label", sort: true });
 preLocalize("languages.exotic.children", { key: "label", sort: true });
 preLocalize("languages.exotic.children.primordial.children", { sort: true });
-patchConfig("languages", "label", { since: "DnD5e 2.4", until: "DnD5e 3.1" });
 
 /* -------------------------------------------- */
 
@@ -2879,16 +3318,10 @@ DND5E.CR_EXP_LEVELS = [
 ];
 
 /**
- * @typedef {object} CharacterFlagConfig
- * @property {string} name
- * @property {string} hint
- * @property {string} section
- * @property {typeof boolean|string|number} type
- * @property {string} placeholder
- * @property {string[]} [abilities]
- * @property {Object<string, string>} [choices]
- * @property {string[]} [skills]
+ * Intervals above the maximum XP that result in an epic boon.
+ * @type {number}
  */
+DND5E.epicBoonInterval = 30000;
 
 /* -------------------------------------------- */
 
@@ -2913,6 +3346,7 @@ DND5E.CR_EXP_LEVELS = [
  * @property {object} [children]           Mapping of category key to an object defining its children.
  * @property {boolean} [sortCategories]    Whether top-level categories should be sorted.
  * @property {boolean} [expertise]         Can an actor receive expertise in this trait?
+ * @property {boolean} [mastery]           Can an actor receive mastery in this trait?
  */
 
 /**
@@ -2925,7 +3359,7 @@ DND5E.traits = {
       title: "DND5E.ClassSaves",
       localization: "DND5E.TraitSavesPlural"
     },
-    icon: "systems/dnd5e/icons/svg/trait-saves.svg",
+    icon: "icons/magic/life/ankh-gold-blue.webp",
     actorKeyPath: "system.abilities",
     configKey: "abilities",
     labelKeyPath: "label"
@@ -2935,7 +3369,7 @@ DND5E.traits = {
       title: "DND5E.Skills",
       localization: "DND5E.TraitSkillsPlural"
     },
-    icon: "systems/dnd5e/icons/svg/trait-skills.svg",
+    icon: "icons/tools/instruments/harp-yellow-teal.webp",
     actorKeyPath: "system.skills",
     labelKeyPath: "label",
     expertise: true
@@ -2945,14 +3379,14 @@ DND5E.traits = {
       title: "DND5E.Languages",
       localization: "DND5E.TraitLanguagesPlural"
     },
-    icon: "systems/dnd5e/icons/svg/trait-languages.svg"
+    icon: "icons/skills/social/diplomacy-peace-alliance.webp"
   },
   armor: {
     labels: {
       title: "DND5E.TraitArmorProf",
       localization: "DND5E.TraitArmorPlural"
     },
-    icon: "systems/dnd5e/icons/svg/trait-armor-proficiencies.svg",
+    icon: "icons/equipment/chest/breastplate-helmet-metal.webp",
     actorKeyPath: "system.traits.armorProf",
     configKey: "armorProficiencies",
     subtypes: { keyPath: "armor.type", ids: ["armorIds", "shieldIds"] }
@@ -2962,17 +3396,18 @@ DND5E.traits = {
       title: "DND5E.TraitWeaponProf",
       localization: "DND5E.TraitWeaponPlural"
     },
-    icon: "systems/dnd5e/icons/svg/trait-weapon-proficiencies.svg",
+    icon: "icons/skills/melee/weapons-crossed-swords-purple.webp",
     actorKeyPath: "system.traits.weaponProf",
     configKey: "weaponProficiencies",
-    subtypes: { keyPath: "weaponType", ids: ["weaponIds"] }
+    subtypes: { keyPath: "weaponType", ids: ["weaponIds"] },
+    mastery: true
   },
   tool: {
     labels: {
       title: "DND5E.TraitToolProf",
       localization: "DND5E.TraitToolPlural"
     },
-    icon: "systems/dnd5e/icons/svg/trait-tool-proficiencies.svg",
+    icon: "icons/skills/trades/smithing-anvil-silver-red.webp",
     actorKeyPath: "system.tools",
     configKey: "toolProficiencies",
     subtypes: { keyPath: "toolType", ids: ["toolIds"] },
@@ -3037,11 +3472,27 @@ DND5E.traitModes = {
   upgrade: {
     label: "DND5E.AdvancementTraitModeUpgradeLabel",
     hint: "DND5E.AdvancementTraitModeUpgradeHint"
+  },
+  mastery: {
+    label: "DND5E.AdvancementTraitModeMasteryLabel",
+    hint: "DND5E.AdvancementTraitModeMasteryHint"
   }
 };
 preLocalize("traitModes", { keys: ["label", "hint"] });
 
 /* -------------------------------------------- */
+
+/**
+ * @typedef {object} CharacterFlagConfig
+ * @property {string} name
+ * @property {string} hint
+ * @property {string} section
+ * @property {typeof boolean|string|number} type
+ * @property {string} placeholder
+ * @property {string[]} [abilities]
+ * @property {Object<string, string>} [choices]
+ * @property {string[]} [skills]
+ */
 
 /**
  * Special character flags.
@@ -3051,6 +3502,12 @@ DND5E.characterFlags = {
   diamondSoul: {
     name: "DND5E.FlagsDiamondSoul",
     hint: "DND5E.FlagsDiamondSoulHint",
+    section: "DND5E.Feats",
+    type: Boolean
+  },
+  enhancedDualWielding: {
+    name: "DND5E.FLAGS.EnhancedDualWielding.Name",
+    hint: "DND5E.FLAGS.EnhancedDualWielding.Hint",
     section: "DND5E.Feats",
     type: Boolean
   },
@@ -3162,6 +3619,42 @@ preLocalize("groupTypes");
 /* -------------------------------------------- */
 
 /**
+ * Configuration information for activity types.
+ *
+ * @typedef {object} ActivityTypeConfiguration
+ * @property {typeof Activity} documentClass  The activity's document class.
+ * @property {boolean} [hidden]               Should this activity type be hidden in the selection dialog?
+ */
+DND5E.activityTypes = {
+  attack: {
+    documentClass: activities.AttackActivity
+  },
+  check: {
+    documentClass: activities.CheckActivity
+  },
+  damage: {
+    documentClass: activities.DamageActivity
+  },
+  enchant: {
+    documentClass: activities.EnchantActivity
+  },
+  heal: {
+    documentClass: activities.HealActivity
+  },
+  save: {
+    documentClass: activities.SaveActivity
+  },
+  summon: {
+    documentClass: activities.SummonActivity
+  },
+  utility: {
+    documentClass: activities.UtilityActivity
+  }
+};
+
+/* -------------------------------------------- */
+
+/**
  * Configuration information for advancement types.
  *
  * @typedef {object} AdvancementTypeConfiguration
@@ -3200,6 +3693,10 @@ DND5E.advancementTypes = {
   Size: {
     documentClass: advancement.SizeAdvancement,
     validItemTypes: new Set(["race"])
+  },
+  Subclass: {
+    documentClass: advancement.SubclassAdvancement,
+    validItemTypes: new Set(["class"])
   },
   Trait: {
     documentClass: advancement.TraitAdvancement,
@@ -3256,7 +3753,7 @@ DND5E.ruleTypes = {
     references: "enrichmentLookup.abilities"
   },
   areaOfEffect: {
-    label: "DND5E.AreaOfEffect",
+    label: "DND5E.AreaOfEffect.Label",
     references: "areaTargetTypes"
   },
   condition: {
@@ -3286,6 +3783,10 @@ DND5E.ruleTypes = {
   spellTag: {
     label: "DND5E.SpellTag",
     references: "itemProperties"
+  },
+  weaponMastery: {
+    label: "DND5E.WEAPON.Mastery.Label",
+    references: "weaponMasteries"
   }
 };
 preLocalize("ruleTypes", { key: "label" });
@@ -3481,9 +3982,7 @@ preLocalize("tokenRings.effects");
  * List of books available as sources.
  * @enum {string}
  */
-DND5E.sourceBooks = {
-  "SRD 5.1": "SOURCE.BOOK.SRD"
-};
+DND5E.sourceBooks = {};
 preLocalize("sourceBooks", { sort: true });
 
 /* -------------------------------------------- */

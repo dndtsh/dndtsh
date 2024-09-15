@@ -1,6 +1,6 @@
 import CharacterData from "../../data/actor/character.mjs";
 import * as Trait from "../../documents/actor/trait.mjs";
-import { simplifyBonus } from "../../utils.mjs";
+import { formatNumber } from "../../utils.mjs";
 import CompendiumBrowser from "../compendium-browser.mjs";
 import ContextMenu5e from "../context-menu.mjs";
 import SheetConfig5e from "../sheet-config.mjs";
@@ -18,7 +18,8 @@ export default class ActorSheet5eCharacter2 extends ActorSheetV2Mixin(ActorSheet
       classes: ["dnd5e2", "sheet", "actor", "character", "vertical-tabs"],
       tabs: [{ navSelector: ".tabs", contentSelector: ".tab-body", initial: "details" }],
       dragDrop: [
-        { dragSelector: ".item-list .item", dropSelector: null },
+        { dragSelector: ".item-list .item > .item-row", dropSelector: null },
+        { dragSelector: ".item-list .item .activity-row", dropSelector: null },
         { dragSelector: ".containers .container", dropSelector: null },
         { dragSelector: ".favorites :is([data-item-id], [data-effect-id])", dropSelector: null },
         { dragSelector: ":is(.race, .background)[data-item-id]", dropSelector: null },
@@ -159,7 +160,7 @@ export default class ActorSheet5eCharacter2 extends ActorSheetV2Mixin(ActorSheet
     for ( const [key, entry] of Object.entries(context.skills).concat(Object.entries(context.tools)) ) {
       entry.class = this.constructor.PROFICIENCY_CLASSES[context.editable ? entry.baseValue : entry.value];
       if ( key in CONFIG.DND5E.skills ) entry.reference = CONFIG.DND5E.skills[key].reference;
-      else if ( key in CONFIG.DND5E.toolIds ) entry.reference = Trait.getBaseItemUUID(CONFIG.DND5E.toolIds[key]);
+      else if ( key in CONFIG.DND5E.tools ) entry.reference = Trait.getBaseItemUUID(CONFIG.DND5E.tools[key].id);
     }
 
     // Character Background
@@ -181,22 +182,19 @@ export default class ActorSheet5eCharacter2 extends ActorSheetV2Mixin(ActorSheet
 
     // Spellcasting
     context.spellcasting = [];
-    const msak = simplifyBonus(this.actor.system.bonuses.msak.attack, context.rollData);
-    const rsak = simplifyBonus(this.actor.system.bonuses.rsak.attack, context.rollData);
-
     for ( const item of Object.values(this.actor.classes).sort((a, b) => b.system.levels - a.system.levels) ) {
       const sc = item.spellcasting;
       if ( !sc?.progression || (sc.progression === "none") ) continue;
       const ability = this.actor.system.abilities[sc.ability];
       const mod = ability?.mod ?? 0;
-      const attackBonus = msak === rsak ? msak : 0;
       const name = item.system.spellcasting.progression === sc.progression ? item.name : item.subclass?.name;
       context.spellcasting.push({
         label: game.i18n.format("DND5E.SpellcastingClass", { class: name }),
         ability: { mod, ability: sc.ability },
-        attack: mod + this.actor.system.attributes.prof + attackBonus,
+        attack: sc.attack,
+        preparation: sc.preparation,
         primary: this.actor.system.attributes.spellcasting === sc.ability,
-        save: ability?.dc ?? 0
+        save: sc.save
       });
     }
 
@@ -214,6 +212,15 @@ export default class ActorSheet5eCharacter2 extends ActorSheetV2Mixin(ActorSheet
     context.favorites = await this._prepareFavorites();
     context.favorites.sort((a, b) => a.sort - b.sort);
 
+    // Epic Boons
+    if ( context.system.details.xp.boonsEarned !== undefined ) {
+      const pluralRules = new Intl.PluralRules(game.i18n.lang);
+      context.epicBoonsEarned = game.i18n.format(
+        `DND5E.ExperiencePointsBoons.${pluralRules.select(context.system.details.xp.boonsEarned ?? 0)}`,
+        { number: formatNumber(context.system.details.xp.boonsEarned ?? 0, { signDisplay: "always" }) }
+      );
+    }
+
     return context;
   }
 
@@ -227,6 +234,15 @@ export default class ActorSheet5eCharacter2 extends ActorSheetV2Mixin(ActorSheet
       ?.items?.sort((a, b) => a.sort - b.sort);
     context.inventory = context.inventory.filter(entry => entry.items.length);
     context.inventory.push({ label: "DND5E.Contents", items: [], dataset: { type: "all" } });
+    context.inventory.forEach(section => {
+      section.categories = [
+        { activityPartial: "dnd5e.activity-column-price" },
+        { activityPartial: "dnd5e.activity-column-weight" },
+        { activityPartial: "dnd5e.activity-column-quantity" },
+        { activityPartial: "dnd5e.activity-column-uses" },
+        { activityPartial: "dnd5e.activity-column-controls" }
+      ];
+    });
 
     // Remove races & background as they are shown on the details tab instead.
     const features = context.features.filter(f => (f.dataset.type !== "background") && (f.dataset.type !== "race"));
@@ -245,7 +261,7 @@ export default class ActorSheet5eCharacter2 extends ActorSheetV2Mixin(ActorSheet
     });
 
     if ( this.actor.system.details.race instanceof dnd5e.documents.Item5e ) {
-      features.push({ label: "DND5E.FeaturesRace", items: [], dataset: { type: "race" } });
+      features.push({ label: "DND5E.Species.Features", items: [], dataset: { type: "race" } });
     }
 
     if ( this.actor.system.details.background instanceof dnd5e.documents.Item5e ) {
@@ -271,9 +287,18 @@ export default class ActorSheet5eCharacter2 extends ActorSheetV2Mixin(ActorSheet
     // TODO: Customise this per-section.
     features.forEach(section => {
       section.categories = [
-        { classes: "item-uses", label: "DND5E.Uses", partial: "dnd5e.column-uses" },
-        { classes: "item-recovery", label: "DND5E.Recovery", partial: "dnd5e.column-recovery" },
-        { classes: "item-controls", partial: "dnd5e.column-feature-controls" }
+        {
+          classes: "item-uses", label: "DND5E.Uses", itemPartial: "dnd5e.column-uses",
+          activityPartial: "dnd5e.activity-column-uses"
+        },
+        {
+          classes: "item-recovery", label: "DND5E.Recovery", itemPartial: "dnd5e.column-recovery",
+          activityPartial: "dnd5e.activity-column-recovery"
+        },
+        {
+          classes: "item-controls", itemPartial: "dnd5e.column-feature-controls",
+          activityPartial: "dnd5e.activity-column-controls"
+        }
       ];
     });
   }
@@ -288,9 +313,11 @@ export default class ActorSheet5eCharacter2 extends ActorSheetV2Mixin(ActorSheet
 
     // Apply special context menus for items outside inventory elements
     const featuresElement = html[0].querySelector(`[data-tab="features"] ${this.options.elements.inventory}`);
-    if ( featuresElement ) new ContextMenu5e(html, ".pills-lg [data-item-id]", [], {
-      onOpen: (...args) => featuresElement._onOpenContextMenu(...args)
-    });
+    if ( featuresElement ) {
+      new ContextMenu5e(html, ".pills-lg [data-item-id], .favorites [data-item-id]", [], {
+        onOpen: (...args) => featuresElement._onOpenContextMenu(...args)
+      });
+    }
 
     // Edit mode only.
     if ( this._mode === this.constructor.MODES.EDIT ) {
@@ -317,14 +344,6 @@ export default class ActorSheet5eCharacter2 extends ActorSheetV2Mixin(ActorSheet
   /* -------------------------------------------- */
 
   /** @inheritDoc */
-  _disableFields(form) {
-    super._disableFields(form);
-    form.querySelectorAll(".interface-only").forEach(input => input.disabled = false);
-  }
-
-  /* -------------------------------------------- */
-
-  /** @inheritDoc */
   async activateEditor(name, options={}, initialContent="") {
     options.relativeLinks = true;
     options.plugins = {
@@ -335,6 +354,33 @@ export default class ActorSheet5eCharacter2 extends ActorSheetV2Mixin(ActorSheet
       })
     };
     return super.activateEditor(name, options, initialContent);
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Handling beginning a drag-drop operation on an Activity.
+   * @param {DragEvent} event  The originating drag event.
+   * @protected
+   */
+  _onDragActivity(event) {
+    const { itemId } = event.target.closest("[data-item-id]").dataset;
+    const { activityId } = event.target.closest("[data-activity-id]").dataset;
+    const activity = this.actor.items.get(itemId)?.system.activities?.get(activityId);
+    if ( activity ) event.dataTransfer.setData("text/plain", JSON.stringify(activity.toDragData()));
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Handle beginning a drag-drop operation on an Item.
+   * @param {DragEvent} event  The originating drag event.
+   * @protected
+   */
+  _onDragItem(event) {
+    const { itemId } = event.target.closest("[data-item-id]").dataset;
+    const item = this.actor.items.get(itemId);
+    if ( item ) event.dataTransfer.setData("text/plain", JSON.stringify(item.toDragData()));
   }
 
   /* -------------------------------------------- */
@@ -352,9 +398,15 @@ export default class ActorSheet5eCharacter2 extends ActorSheetV2Mixin(ActorSheet
     const isSlots = event.target.closest("[data-favorite-id]") || event.target.classList.contains("spell-header");
     let type;
     if ( key in CONFIG.DND5E.skills ) type = "skill";
-    else if ( key in CONFIG.DND5E.toolIds ) type = "tool";
+    else if ( key in CONFIG.DND5E.tools ) type = "tool";
     else if ( modes[preparationMode]?.upcast && (level !== "0") && isSlots ) type = "slots";
-    if ( !type ) return super._onDragStart(event);
+    if ( !type ) {
+      if ( event.target.matches("[data-item-id] > .item-row") ) return this._onDragItem(event);
+      else if ( event.target.matches("[data-item-id] [data-activity-id], [data-item-id][data-activity-id]") ) {
+        return this._onDragActivity(event);
+      }
+      return super._onDragStart(event);
+    }
     const dragData = { dnd5e: { action: "favorite", type } };
     if ( type === "slots" ) dragData.dnd5e.id = (preparationMode === "prepared") ? `spell${level}` : preparationMode;
     else dragData.dnd5e.id = key;
@@ -387,7 +439,9 @@ export default class ActorSheet5eCharacter2 extends ActorSheetV2Mixin(ActorSheet
   _onAction(event) {
     const target = event.currentTarget;
     switch ( target.dataset.action ) {
-      case "findItem": this._onFindItem(target.dataset.itemType); break;
+      case "findItem":
+        this._onFindItem(target.dataset.itemType, { classIdentifier: target.dataset.classIdentifier });
+        break;
       case "removeFavorite": this._onRemoveFavorite(event); break;
       case "spellcasting": this._onToggleSpellcasting(event); break;
       case "toggleInspiration": this._onToggleInspiration(); break;
@@ -421,19 +475,16 @@ export default class ActorSheet5eCharacter2 extends ActorSheetV2Mixin(ActorSheet
 
   /**
    * Show available items of a given type.
-   * @param {string} type  The item type.
+   * @param {string} type                       The item type.
+   * @param {object} [options={}]
+   * @param {string} [options.classIdentifier]  Identifier of the class when finding a subclass.
    * @protected
    */
-  async _onFindItem(type) {
-    if ( game.release.generation < 12 ) {
-      switch ( type ) {
-        case "class": game.packs.get(CONFIG.DND5E.sourcePacks.CLASSES)?.render(true); break;
-        case "race": game.packs.get(CONFIG.DND5E.sourcePacks.RACES)?.render(true); break;
-        case "background": game.packs.get(CONFIG.DND5E.sourcePacks.BACKGROUNDS)?.render(true); break;
-      }
-    } else {
-      new CompendiumBrowser({ filters: { locked: { types: new Set([type]) } } }).render(true);
-    }
+  async _onFindItem(type, { classIdentifier }={}) {
+    const filters = { locked: { types: new Set([type]) } };
+    if ( classIdentifier ) filters.locked.additional = { class: { [classIdentifier]: 1 } };
+    const result = await CompendiumBrowser.selectOne({ filters });
+    if ( result ) this._onDropItemCreate(await fromUuid(result));
   }
 
   /* -------------------------------------------- */
@@ -472,7 +523,7 @@ export default class ActorSheet5eCharacter2 extends ActorSheetV2Mixin(ActorSheet
   /** @inheritDoc */
   async _onDrop(event) {
     if ( !event.target.closest(".favorites") ) return super._onDrop(event);
-    const dragData = event.dataTransfer.getData("application/json");
+    const dragData = event.dataTransfer.getData("application/json") || event.dataTransfer.getData("text/plain");
     if ( !dragData ) return super._onDrop(event);
     let data;
     try {
@@ -483,6 +534,25 @@ export default class ActorSheet5eCharacter2 extends ActorSheetV2Mixin(ActorSheet
     }
     const { action, type, id } = data.dnd5e ?? {};
     if ( action === "favorite" ) return this._onDropFavorite(event, { type, id });
+    if ( data.type === "Activity" ) return this._onDropActivity(event, data);
+    return super._onDrop(event);
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Handle dropping an Activity onto the sheet.
+   * @param {DragEvent} event  The originating drag event.
+   * @param {object} data      The Activity drag data.
+   * @returns {Promise<Actor5e|void>}
+   * @protected
+   */
+  async _onDropActivity(event, data) {
+    if ( !event.target.closest(".favorites") ) return;
+    const activity = await fromUuid(data.uuid);
+    if ( !activity ) return;
+    const uuid = `${activity.item.getRelativeUUID(this.actor)}.Activity.${activity.id}`;
+    return this._onDropFavorite(event, { type: "activity", id: uuid });
   }
 
   /* -------------------------------------------- */
@@ -511,7 +581,7 @@ export default class ActorSheet5eCharacter2 extends ActorSheetV2Mixin(ActorSheet
 
   /**
    * Handle an owned item or effect being dropped in the favorites area.
-   * @param {PointerEvent} event         The triggering event.
+   * @param {DragEvent} event            The triggering event.
    * @param {ActorFavorites5e} favorite  The favorite that was dropped.
    * @returns {Promise<Actor5e>|void}
    * @protected
@@ -574,10 +644,12 @@ export default class ActorSheet5eCharacter2 extends ActorSheetV2Mixin(ActorSheet
    * @protected
    */
   async _onUseFavorite(event) {
-    if ( !this.isEditable ) return;
+    if ( !this.isEditable || (event.target.tagName === "INPUT") ) return;
     const { favoriteId } = event.currentTarget.closest("[data-favorite-id]").dataset;
     const favorite = await fromUuid(favoriteId, { relative: this.actor });
-    if ( favorite instanceof dnd5e.documents.Item5e ) return favorite.use({}, { event });
+    if ( (favorite instanceof dnd5e.documents.Item5e) || event.currentTarget.dataset.activityId ) {
+      return favorite.use({ legacy: false, event });
+    }
     if ( favorite instanceof dnd5e.documents.ActiveEffect5e ) return favorite.update({ disabled: !favorite.disabled });
   }
 
@@ -616,7 +688,7 @@ export default class ActorSheet5eCharacter2 extends ActorSheetV2Mixin(ActorSheet
 
       let data;
       if ( type === "item" ) data = await favorite.system.getFavoriteData();
-      else if ( type === "effect" ) data = await favorite.getFavoriteData();
+      else if ( (type === "effect") || (type === "activity") ) data = await favorite.getFavoriteData();
       else data = await this._getFavoriteData(type, id);
       if ( !data ) return arr;
       let {
@@ -625,7 +697,7 @@ export default class ActorSheet5eCharacter2 extends ActorSheetV2Mixin(ActorSheet
       } = data;
 
       const css = [];
-      if ( uses ) {
+      if ( uses?.max ) {
         css.push("uses");
         uses.value = Math.round(uses.value);
       }
@@ -634,7 +706,7 @@ export default class ActorSheet5eCharacter2 extends ActorSheetV2Mixin(ActorSheet
       else if ( value !== undefined ) css.push("value");
 
       if ( toggle === false ) css.push("disabled");
-      if ( uses?.max > 100 ) css.push("uses-sm");
+      if ( uses?.max > 99 ) css.push("uses-sm");
       if ( modifier !== undefined ) {
         const value = Number(modifier.replace?.(/\s+/g, "") ?? modifier);
         if ( !isNaN(value) ) modifier = value;
@@ -646,11 +718,12 @@ export default class ActorSheet5eCharacter2 extends ActorSheetV2Mixin(ActorSheet
       else if ( type === "tool" ) rollableClass.push("tool-name");
 
       if ( suppressed ) subtitle = game.i18n.localize("DND5E.Suppressed");
+      const itemId = type === "item" ? favorite.id : type === "activity" ? favorite.item.id : null;
       arr.push({
-        id, img, type, title, value, uses, sort, save, modifier, passive, range, reference, suppressed, level,
-        itemId: type === "item" ? favorite.id : null,
+        id, img, type, title, value, uses, sort, save, modifier, passive, range, reference, suppressed, level, itemId,
         effectId: type === "effect" ? favorite.id : null,
         parentId: (type === "effect") && (favorite.parent !== favorite.target) ? favorite.parent.id: null,
+        activityId: type === "activity" ? favorite.id : null,
         preparationMode: (type === "slots") ? (/spell\d+/.test(id) ? "prepared" : id) : null,
         key: (type === "skill") || (type === "tool") ? id : null,
         toggle: toggle === undefined ? null : { applicable: true, value: toggle },

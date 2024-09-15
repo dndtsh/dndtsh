@@ -1,25 +1,36 @@
 import Actor5e from "../../documents/actor/actor.mjs";
+import { splitSemicolons } from "../../utils.mjs";
 import { ItemDataModel } from "../abstract.mjs";
-import { AdvancementField, IdentifierField } from "../fields.mjs";
+import AdvancementField from "../fields/advancement-field.mjs";
 import { CreatureTypeField, MovementField, SensesField } from "../shared/_module.mjs";
 import ItemDescriptionTemplate from "./templates/item-description.mjs";
+
+const { ArrayField } = foundry.data.fields;
 
 /**
  * Data definition for Race items.
  * @mixes ItemDescriptionTemplate
  *
- * @property {string} identifier       Identifier slug for this race.
  * @property {object[]} advancement    Advancement objects for this race.
  * @property {MovementField} movement
  * @property {SensesField} senses
  * @property {CreatureType} type
  */
 export default class RaceData extends ItemDataModel.mixin(ItemDescriptionTemplate) {
-  /** @inheritdoc */
+
+  /* -------------------------------------------- */
+  /*  Model Configuration                         */
+  /* -------------------------------------------- */
+
+  /** @override */
+  static LOCALIZATION_PREFIXES = ["DND5E.SOURCE"];
+
+  /* -------------------------------------------- */
+
+  /** @inheritDoc */
   static defineSchema() {
     return this.mergeSchema(super.defineSchema(), {
-      identifier: new IdentifierField({label: "DND5E.Identifier"}),
-      advancement: new foundry.data.fields.ArrayField(new AdvancementField(), {label: "DND5E.AdvancementTitle"}),
+      advancement: new ArrayField(new AdvancementField(), { label: "DND5E.AdvancementTitle" }),
       movement: new MovementField(),
       senses: new SensesField(),
       type: new CreatureTypeField({ swarm: false }, { initial: { value: "humanoid" } })
@@ -28,7 +39,7 @@ export default class RaceData extends ItemDataModel.mixin(ItemDescriptionTemplat
 
   /* -------------------------------------------- */
 
-  /** @inheritdoc */
+  /** @inheritDoc */
   static metadata = Object.freeze(foundry.utils.mergeObject(super.metadata, {
     singleton: true
   }, {inplace: false}));
@@ -80,7 +91,7 @@ export default class RaceData extends ItemDataModel.mixin(ItemDescriptionTemplat
       const value = this.senses[k];
       if ( value ) arr.push(`${label} ${value} ${units}`);
       return arr;
-    }, []).concat(this.senses.special.split(";").filter(l => l));
+    }, []).concat(splitSemicolons(this.senses.special));
   }
 
   /* -------------------------------------------- */
@@ -91,6 +102,60 @@ export default class RaceData extends ItemDataModel.mixin(ItemDescriptionTemplat
    */
   get typeLabel() {
     return Actor5e.formatCreatureType(this.type);
+  }
+
+  /* -------------------------------------------- */
+  /*  Data Preparation                            */
+  /* -------------------------------------------- */
+
+  /** @inheritDoc */
+  prepareDerivedData() {
+    super.prepareDerivedData();
+    this.prepareDescriptionData();
+  }
+
+  /* -------------------------------------------- */
+
+  /** @inheritDoc */
+  async getSheetData(context) {
+    context.subtitles = [{ label: context.itemType }];
+    context.singleDescription = true;
+    context.info = [{
+      label: "DND5E.CreatureType",
+      classes: "info-sm",
+      value: this.typeLabel,
+      config: "type",
+      tooltip: "DND5E.CreatureTypeTitle"
+    },
+    {
+      label: "DND5E.Movement",
+      classes: "info-sm info-grid",
+      config: "movement",
+      tooltip: "DND5E.MovementConfig",
+      value: Object.entries(CONFIG.DND5E.movementTypes).reduce((str, [k, label]) => {
+        const value = this.movement[k];
+        if ( !value ) return str;
+        return `${str}
+          <span class="key">${label}</span>
+          <span class="value">${value}</span>
+        `;
+      }, "")
+    },
+    {
+      label: "DND5E.Senses",
+      classes: "info-sm info-grid",
+      config: "senses",
+      tooltip: "DND5E.SensesConfig",
+      value: Object.entries(CONFIG.DND5E.senses).reduce((str, [k, label]) => {
+        const value = this.senses[k];
+        if ( !value ) return str;
+        return `${str}
+          <span class="key">${label}</span>
+          <span class="value">${value}</span>
+        `;
+      }, "")
+    }];
+    context.parts = ["dnd5e.details-species"];
   }
 
   /* -------------------------------------------- */

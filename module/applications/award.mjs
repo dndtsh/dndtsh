@@ -6,7 +6,7 @@ import DialogMixin from "./dialog-mixin.mjs";
  */
 export default class Award extends DialogMixin(FormApplication) {
 
-  /** @inheritdoc */
+  /** @inheritDoc */
   static get defaultOptions() {
     return foundry.utils.mergeObject(super.defaultOptions, {
       classes: ["dnd5e2", "award", "dialog"],
@@ -52,7 +52,7 @@ export default class Award extends DialogMixin(FormApplication) {
   /*  Rendering                                   */
   /* -------------------------------------------- */
 
-  /** @inheritdoc */
+  /** @inheritDoc */
   getData(options={}) {
     const context = super.getData(options);
 
@@ -63,7 +63,7 @@ export default class Award extends DialogMixin(FormApplication) {
     }, {});
     context.destinations = Award.prepareDestinations(this.transferDestinations, this.options.savedDestinations);
     context.each = this.options.each ?? false;
-    context.hideXP = game.settings.get("dnd5e", "disableExperienceTracking");
+    context.hideXP = game.settings.get("dnd5e", "levelingMode") === "noxp";
     context.noPrimaryParty = !game.settings.get("dnd5e", "primaryParty")?.actor && !this.isPartyAward;
     context.xp = this.options.xp ?? this.object?.system.details.xp.value ?? this.object?.system.details.xp.derived;
 
@@ -123,7 +123,7 @@ export default class Award extends DialogMixin(FormApplication) {
 
   /* -------------------------------------------- */
 
-  /** @inheritdoc */
+  /** @inheritDoc */
   async _updateObject(event, formData) {
     const data = foundry.utils.expandObject(formData);
     const destinations = this.transferDestinations.filter(d => data.destination[d.id]);
@@ -214,7 +214,8 @@ export default class Award extends DialogMixin(FormApplication) {
     destinations = destinations.filter(d => ["character", "group"].includes(d.type));
     if ( !amount || !destinations.length ) return;
 
-    let originUpdate = origin ? (origin.system.details.xp.value ?? 0) : Infinity;
+    const xp = origin?.system.details.xp;
+    let originUpdate = origin ? (xp.value ?? xp.derived ?? 0) : Infinity;
     if ( each ) amount = amount * destinations.length;
     const perDestination = Math.floor(Math.min(amount, originUpdate) / destinations.length);
     originUpdate -= amount;
@@ -264,8 +265,6 @@ export default class Award extends DialogMixin(FormApplication) {
         content,
         whisper: whisper ? whisperTargets : []
       };
-      // TODO: Remove when v11 support is dropped.
-      if ( game.release.generation < 12 ) messageData.type = CONST.CHAT_MESSAGE_TYPES.OTHER;
       messages.push(messageData);
     }
     if ( messages.length ) cls.createDocuments(messages);

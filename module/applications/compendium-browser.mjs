@@ -1,7 +1,6 @@
 import * as Filter from "../filter.mjs";
-
-const ApplicationV2 = foundry.applications?.api?.ApplicationV2 ?? (class {});
-const HandlebarsApplicationMixin = foundry.applications?.api?.HandlebarsApplicationMixin ?? (cls => cls);
+import SourceField from "../data/shared/source-field.mjs";
+import CompendiumBrowserSourceConfig from "./compendium-browser-source-config.mjs";
 
 /**
  * @typedef {ApplicationConfiguration} CompendiumBrowserConfiguration
@@ -52,9 +51,10 @@ const HandlebarsApplicationMixin = foundry.applications?.api?.HandlebarsApplicat
  * @mixes HandlebarsApplicationMixin
  * @template CompendiumBrowserConfiguration
  */
-export default class CompendiumBrowser extends HandlebarsApplicationMixin(ApplicationV2) {
+export default class CompendiumBrowser extends foundry.applications.api.HandlebarsApplicationMixin(
+  foundry.applications.api.ApplicationV2
+) {
   constructor(...args) {
-    if ( game.release.generation < 12 ) throw Error("Compendium Browser only works in Foundry V12 or later");
     super(...args);
 
     this.#filters = this.options.filters?.initial ?? {};
@@ -83,6 +83,7 @@ export default class CompendiumBrowser extends HandlebarsApplicationMixin(Applic
       resizable: true
     },
     actions: {
+      configureSources: CompendiumBrowser.#onConfigureSources,
       clearName: CompendiumBrowser.#onClearName,
       openLink: CompendiumBrowser.#onOpenLink,
       setFilter: CompendiumBrowser.#onSetFilter,
@@ -134,7 +135,8 @@ export default class CompendiumBrowser extends HandlebarsApplicationMixin(Applic
     filters: {
       id: "sidebar-filters",
       classes: ["sidebar-part"],
-      template: "systems/dnd5e/templates/compendium/browser-sidebar-filters.hbs"
+      template: "systems/dnd5e/templates/compendium/browser-sidebar-filters.hbs",
+      templates: ["systems/dnd5e/templates/compendium/browser-sidebar-filter-set.hbs"]
     },
     results: {
       id: "results",
@@ -316,6 +318,12 @@ export default class CompendiumBrowser extends HandlebarsApplicationMixin(Applic
       { inplace: false }
     );
     filters.documentClass ??= "Item";
+    if ( filters.additional?.source ) {
+      filters.additional.source = Object.entries(filters.additional.source).reduce((obj, [k, v]) => {
+        obj[k.slugify({ strict: true })] = v;
+        return obj;
+      }, {});
+    }
     return filters;
   }
 
@@ -374,6 +382,14 @@ export default class CompendiumBrowser extends HandlebarsApplicationMixin(Applic
   /* -------------------------------------------- */
 
   /**
+   * The cached set of available sources to filter on.
+   * @type {Record<string, string>}
+   */
+  #sources;
+
+  /* -------------------------------------------- */
+
+  /**
    * The mode the browser is currently in.
    * @type {CompendiumBrowser.MODES}
    */
@@ -425,7 +441,19 @@ export default class CompendiumBrowser extends HandlebarsApplicationMixin(Applic
         if ( !first ) return second;
         return CompendiumBrowser.intersectFilters(first, second);
       }, null) ?? new Map();
-
+    context.filterDefinitions.set("source", {
+      label: "DND5E.SOURCE.FIELDS.source.label",
+      type: "set",
+      config: {
+        keyPath: "system.source.slug",
+        choices: foundry.utils.mergeObject(
+          this.#sources ?? {},
+          Object.fromEntries(Object.keys(this.options.filters?.locked?.additional?.source ?? {}).map(k => {
+            return [k.slugify({ strict: true }), CONFIG.DND5E.sourceBooks[k] ?? k];
+          })), { inplace: false }
+        )
+      }
+    });
     return context;
   }
 
@@ -565,7 +593,8 @@ export default class CompendiumBrowser extends HandlebarsApplicationMixin(Applic
     if ( this.#filters.name?.length ) filters.push({ k: "name", o: "icontains", v: this.#filters.name });
     this.#results = CompendiumBrowser.fetch(CONFIG[context.filters.documentClass].documentClass, {
       filters,
-      types: context.filters.types
+      types: context.filters.types,
+      indexFields: new Set(["system.source"])
     });
     context.displaySelection = this.displaySelection;
     return context;
@@ -598,6 +627,21 @@ export default class CompendiumBrowser extends HandlebarsApplicationMixin(Applic
 
   /* -------------------------------------------- */
 
+  /** @inheritDoc */
+  async _renderFrame(options) {
+    const frame = await super._renderFrame(options);
+    if ( game.user.isGM ) {
+      frame.querySelector('[data-action="close"]').insertAdjacentHTML("beforebegin", `
+        <button type="button" class="header-control fas fa-cog" data-action="configureSources"
+                data-tooltip="DND5E.CompendiumBrowser.Sources.Label"
+                aria-label="${game.i18n.localize("DND5E.CompendiumBrowser.Sources.Label")}"></button>
+      `);
+    }
+    return frame;
+  }
+
+  /* -------------------------------------------- */
+
   /**
    * Render a single result entry.
    * @param {object|Document} entry  The entry.
@@ -606,11 +650,12 @@ export default class CompendiumBrowser extends HandlebarsApplicationMixin(Applic
    * @protected
    */
   async _renderResult(entry, documentClass) {
-    const { img, name, type, uuid } = entry;
+    const { img, name, type, uuid, system } = entry;
     // TODO: Provide more useful subtitles.
     const subtitle = CONFIG[documentClass].typeLabels[type] ?? "";
+    const source = system?.source?.value ?? "";
     const context = {
-      entry: { img, name, subtitle, uuid },
+      entry: { img, name, subtitle, uuid, source },
       displaySelection: this.displaySelection,
       selected: this.#selected.has(uuid)
     };
@@ -651,6 +696,39 @@ export default class CompendiumBrowser extends HandlebarsApplicationMixin(Applic
   }
 
   /* -------------------------------------------- */
+
+  /**
+   * Show a list of applicable source filters for the available results.
+   * @protected
+   */
+  async _renderSourceFilters() {
+    const sources = [];
+    for ( const result of this.#results ) {
+      const source = foundry.utils.getProperty(result, "system.source");
+      if ( !source ) continue;
+      const { slug, value } = source;
+      sources.push({ slug, value: CONFIG.DND5E.sourceBooks[value] ?? value });
+    }
+    sources.sort((a, b) => a.value.localeCompare(b.value, game.i18n.lang));
+    this.#sources = Object.fromEntries(sources.map(({ slug, value }) => [slug, value]));
+    const filters = this.element.querySelector('[data-application-part="filters"]');
+    filters.querySelector('[data-filter-id="source"]')?.remove();
+    if ( !sources.length ) return;
+    const locked = Object.entries(this.options.filters?.locked?.additional?.source ?? {}).reduce((obj, [k, v]) => {
+      obj[k.slugify({ strict: true })] = v;
+      return obj;
+    }, {});
+    const filter = await renderTemplate("systems/dnd5e/templates/compendium/browser-sidebar-filter-set.hbs", {
+      locked,
+      value: locked,
+      key: "source",
+      label: "DND5E.SOURCE.FIELDS.source.label",
+      config: { choices: this.#sources }
+    });
+    filters.insertAdjacentHTML("beforeend", filter);
+  }
+
+  /* -------------------------------------------- */
   /*  Event Listeners and Handlers                */
   /* -------------------------------------------- */
 
@@ -661,7 +739,7 @@ export default class CompendiumBrowser extends HandlebarsApplicationMixin(Applic
     let { types } = target.dataset;
     types = types ? types.split(",") : [];
     this._applyTabFilters(tab);
-    this.render({ parts: ["results", "filters", "types"], dnd5e: { browser: { types } } });
+    this.render({ parts: ["results", "filters", "types"], dnd5e: { browser: { types } }, changedTab: true });
   }
 
   /* -------------------------------------------- */
@@ -685,7 +763,9 @@ export default class CompendiumBrowser extends HandlebarsApplicationMixin(Applic
   /** @inheritDoc */
   _attachPartListeners(partId, htmlElement, options) {
     super._attachPartListeners(partId, htmlElement, options);
-    if ( partId === "results" ) this._renderResults();
+    if ( partId === "results" ) this._renderResults().then(() => {
+      if ( options.isFirstRender || options.changedTab ) this._renderSourceFilters();
+    });
     else if ( partId === "types" ) this.#adjustCheckboxStates(htmlElement);
   }
 
@@ -837,6 +917,16 @@ export default class CompendiumBrowser extends HandlebarsApplicationMixin(Applic
   /* -------------------------------------------- */
 
   /**
+   * Handle configuring compendium browser sources.
+   * @this {CompendiumBrowser}
+   */
+  static #onConfigureSources() {
+    new CompendiumBrowserSourceConfig().render({ force: true });
+  }
+
+  /* -------------------------------------------- */
+
+  /**
    * Handle clearing the name filter.
    * @this {CompendiumBrowser}
    * @param {PointerEvent} event  The originating click event.
@@ -971,7 +1061,7 @@ export default class CompendiumBrowser extends HandlebarsApplicationMixin(Applic
     const types = target.checked ? [] : (activeTab?.types ?? ["class"]);
     this._applyModeFilters(this._mode);
     this._applyTabFilters(activeTab?.tab);
-    this.render({ parts: ["results", "filters", "types", "tabs"], dnd5e: { browser: { types } } });
+    this.render({ parts: ["results", "filters", "types", "tabs"], dnd5e: { browser: { types } }, changedTab: true });
   }
 
   /* -------------------------------------------- */
@@ -999,6 +1089,12 @@ export default class CompendiumBrowser extends HandlebarsApplicationMixin(Applic
     // If filters are provided, merge their keys with any other fields needing to be indexed
     if ( filters.length ) indexFields = indexFields.union(Filter.uniqueKeys(filters));
 
+    // Do not attempt to index derived fields as this will throw an error server-side.
+    indexFields.delete("system.source.slug");
+
+    // Collate compendium sources.
+    const sources = CompendiumBrowserSourceConfig.collateSources();
+
     // Iterate over all packs
     let documents = game.packs
 
@@ -1008,7 +1104,7 @@ export default class CompendiumBrowser extends HandlebarsApplicationMixin(Applic
         // Do not show entries inside compendia that are not visible to the current user.
         && p.visible
 
-        // TODO: Filter packs by additional system setting
+        && sources.has(p.collection)
 
         // If types are set and specified in compendium flag, only include those that include the correct types
         && (!types.size || !p.metadata.flags.dnd5e?.types || new Set(p.metadata.flags.dnd5e.types).intersects(types)))
@@ -1018,6 +1114,13 @@ export default class CompendiumBrowser extends HandlebarsApplicationMixin(Applic
 
         // Apply module art to the new index
         .then(index => game.dnd5e.moduleArt.apply(index)))
+
+        // Derive source values
+        .map(i => {
+          const source = foundry.utils.getProperty(i, "system.source");
+          if ( source && i.uuid ) SourceField.prepareData.call(source, i.uuid);
+          return i;
+        })
 
         // Remove any documents that don't match the specified types or the provided filters
         .filter(i => (!types.size || types.has(i.type)) && (!filters.length || Filter.performCheck(i, filters)))
@@ -1031,9 +1134,9 @@ export default class CompendiumBrowser extends HandlebarsApplicationMixin(Applic
 
     if ( sort ) {
       if ( sort === true ) sort = "name";
-      const sortFunc = foundry.utils.getType(sort) === "function" ? sort : (lhs, rhs) => {
-        return String(foundry.utils.getProperty(lhs, sort)).localeCompare(String(foundry.utils.getProperty(rhs, sort)));
-      };
+      const sortFunc = foundry.utils.getType(sort) === "function" ? sort : (lhs, rhs) =>
+        String(foundry.utils.getProperty(lhs, sort))
+          .localeCompare(String(foundry.utils.getProperty(rhs, sort)), game.i18n.lang);
       documents.sort(sortFunc);
     }
 
@@ -1135,7 +1238,6 @@ export default class CompendiumBrowser extends HandlebarsApplicationMixin(Applic
    * @param {HTMLElement} html  HTML of the sidebar being rendered.
    */
   static injectSidebarButton(html) {
-    if ( game.release.generation < 12 ) return;
     const button = document.createElement("button");
     button.type = "button";
     button.classList.add("open-compendium-browser");
