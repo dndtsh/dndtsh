@@ -169,7 +169,7 @@ export default Base => class extends PseudoDocumentMixin(Base) {
    * @returns {Promise<ActivityUsageResults|void>}  Details on the usage process if not canceled.
    */
   async use(usage={}, dialog={}, message={}) {
-    if ( !this.item.isEmbedded ) return;
+    if ( !this.item.isEmbedded || this.item.pack ) return;
     if ( !this.item.isOwner ) {
       ui.notifications.error("DND5E.DocumentUseWarn", { localize: true });
       return;
@@ -234,7 +234,7 @@ export default Base => class extends PseudoDocumentMixin(Base) {
     }
 
     // Handle scaling
-    activity._prepareUsageScaling(usageConfig, messageConfig, item);
+    await activity._prepareUsageScaling(usageConfig, messageConfig, item);
     activity = item.system.activities.get(this.id);
 
     // Handle consumption
@@ -244,7 +244,7 @@ export default Base => class extends PseudoDocumentMixin(Base) {
 
     // Create concentration effect & end previous effects
     if ( usageConfig.concentration?.begin ) {
-      const effect = await item.actor.beginConcentrating(item);
+      const effect = await item.actor.beginConcentrating(activity, { "flags.dnd5e.scaling": usageConfig.scaling });
       if ( effect ) {
         results.effects ??= [];
         results.effects.push(effect);
@@ -570,7 +570,7 @@ export default Base => class extends PseudoDocumentMixin(Base) {
       }
     }
 
-    if ( this.item.requiresConcentration && !game.settings.get("dnd5e", "disableConcentration") ) {
+    if ( this.requiresConcentration && !game.settings.get("dnd5e", "disableConcentration") ) {
       config.concentration ??= {};
       config.concentration.begin ??= true;
       const { effects } = this.actor.concentration;
@@ -593,7 +593,7 @@ export default Base => class extends PseudoDocumentMixin(Base) {
    * @param {Item5e} item                                 Clone of the item that contains this activity.
    * @protected
    */
-  _prepareUsageScaling(usageConfig, messageConfig, item) {
+  async _prepareUsageScaling(usageConfig, messageConfig, item) {
     const levelingFlag = this.item.getFlag("dnd5e", "spellLevel");
     if ( levelingFlag ) {
       usageConfig.scaling = Math.max(0, levelingFlag.value - levelingFlag.base);
@@ -655,7 +655,8 @@ export default Base => class extends PseudoDocumentMixin(Base) {
     if ( ((config.consume === true) || config.consume.spellSlot) && this.requiresSpellSlot ) {
       const mode = this.item.system.preparation.mode;
       const isLeveled = ["always", "prepared"].includes(mode);
-      const slot = config.spell?.slot ?? (isLeveled ? `spell${this.item.system.level}` : mode);
+      const effectiveLevel = this.item.system.level + (config.scaling ?? 0);
+      const slot = config.spell?.slot ?? (isLeveled ? `spell${effectiveLevel}` : mode);
       const slotData = this.actor.system.spells?.[slot];
       if ( slotData ) {
         if ( slotData.value ) {
@@ -720,13 +721,21 @@ export default Base => class extends PseudoDocumentMixin(Base) {
     const data = await this.item.system.getCardData();
     const properties = [...(data.tags ?? []), ...(data.properties ?? [])];
     const supplements = [];
-    if ( (this.activation.type === "reaction") && this.activation.condition ) {
-      supplements.push(`<strong>${game.i18n.localize("DND5E.Reaction")}</strong> ${this.activation.condition}`);
+    if ( this.activation.condition ) {
+      supplements.push(`<strong>${game.i18n.localize("DND5E.Trigger")}</strong> ${this.activation.condition}`);
     }
     if ( data.materials?.value ) {
       supplements.push(`<strong>${game.i18n.localize("DND5E.Materials")}</strong> ${data.materials.value}`);
     }
     const buttons = this._usageChatButtons(message);
+
+    // Include spell level in the subtitle.
+    if ( this.item.type === "spell" ) {
+      const spellLevel = foundry.utils.getProperty(message, "data.flags.dnd5e.use.spellLevel");
+      const { spellLevels, spellSchools } = CONFIG.DND5E;
+      data.subtitle = [spellLevels[spellLevel], spellSchools[this.item.system.school]?.label].filterJoin(" &bull; ");
+    }
+
     return {
       activity: this,
       actor: this.item.actor,
@@ -950,7 +959,7 @@ export default Base => class extends PseudoDocumentMixin(Base) {
       if ( "configure" in dialogConfig ) oldRollConfig.fastForward = !dialogConfig.configure;
       if ( Hooks.call("dnd5e.preRollDamage", this.item, oldRollConfig) === false ) return;
       rollConfig.rolls = rollConfig.rolls.map((roll, index) => {
-        const otherConfig = oldRollConfig.rollConfigs.find(r => r.index === index);
+        const otherConfig = oldRollConfig.rollConfigs.find(r => r._index === index);
         if ( !otherConfig ) return null;
         roll.data = oldRollConfig.data;
         roll.parts = otherConfig.parts;
@@ -958,10 +967,10 @@ export default Base => class extends PseudoDocumentMixin(Base) {
         roll.options.type = otherConfig.type;
         roll.options.types = otherConfig.types;
         roll.options.properties = otherConfig.properties;
-        return rolls;
+        return roll;
       }, [])
         .filter(_ => _)
-        .concat(oldRollConfig.rollConfigs.filter(r => r.index === undefined));
+        .concat(oldRollConfig.rollConfigs.filter(r => r._index === undefined));
       returnMultiple = oldRollConfig.returnMultiple;
       rollConfig.critical ??= {};
       rollConfig.critical.allow = oldRollConfig.allowCritical;
@@ -1149,7 +1158,8 @@ export default Base => class extends PseudoDocumentMixin(Base) {
    */
   async #consumeResource(event, target, message) {
     const messageConfig = {};
-    await this.consume({ consume: true, event }, messageConfig);
+    const scaling = message.getFlag("dnd5e", "scaling");
+    await this.consume({ consume: true, event, scaling }, messageConfig);
     if ( !foundry.utils.isEmpty(messageConfig.data) ) await message.update(messageConfig.data);
   }
 

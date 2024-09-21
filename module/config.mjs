@@ -662,17 +662,15 @@ DND5E.tools = {
   }
 };
 
-const _toolIds = Object.entries(DND5E.tools).reduce((obj, [k, { id }]) => {
-  obj[k] = id;
-  return obj;
-}, {});
-
 /**
  * The basic tool types in 5e. This enables specific tool proficiencies or
  * starting equipment provided by classes and backgrounds.
  * @enum {string}
  */
-DND5E.toolIds = new Proxy(_toolIds, {
+DND5E.toolIds = new Proxy(DND5E.tools, {
+  get(target, prop) {
+    return target[prop]?.id;
+  },
   set(target, prop, value) {
     foundry.utils.logCompatibilityWarning(
       "Appending to CONFIG.DND5E.toolIds is deprecated, use CONFIG.DND5E.tools instead.",
@@ -680,6 +678,7 @@ DND5E.toolIds = new Proxy(_toolIds, {
     );
     target[prop] ??= { ability: "int" };
     target[prop].id = value;
+    return true;
   }
 });
 
@@ -3244,13 +3243,15 @@ DND5E.languages = {
     label: "DND5E.LanguagesStandard",
     children: {
       common: "DND5E.LanguagesCommon",
+      draconic: "DND5E.LanguagesDraconic",
       dwarvish: "DND5E.LanguagesDwarvish",
       elvish: "DND5E.LanguagesElvish",
       giant: "DND5E.LanguagesGiant",
       gnomish: "DND5E.LanguagesGnomish",
       goblin: "DND5E.LanguagesGoblin",
       halfling: "DND5E.LanguagesHalfling",
-      orc: "DND5E.LanguagesOrc"
+      orc: "DND5E.LanguagesOrc",
+      sign: "DND5E.LanguagesCommonSign"
     }
   },
   exotic: {
@@ -3258,9 +3259,10 @@ DND5E.languages = {
     children: {
       aarakocra: "DND5E.LanguagesAarakocra",
       abyssal: "DND5E.LanguagesAbyssal",
+      cant: "DND5E.LanguagesThievesCant",
       celestial: "DND5E.LanguagesCelestial",
       deep: "DND5E.LanguagesDeepSpeech",
-      draconic: "DND5E.LanguagesDraconic",
+      druidic: "DND5E.LanguagesDruidic",
       gith: "DND5E.LanguagesGith",
       gnoll: "DND5E.LanguagesGnoll",
       infernal: "DND5E.LanguagesInfernal",
@@ -3276,9 +3278,7 @@ DND5E.languages = {
       sylvan: "DND5E.LanguagesSylvan",
       undercommon: "DND5E.LanguagesUndercommon"
     }
-  },
-  druidic: "DND5E.LanguagesDruidic",
-  cant: "DND5E.LanguagesThievesCant"
+  }
 };
 preLocalize("languages", { key: "label" });
 preLocalize("languages.standard.children", { key: "label", sort: true });

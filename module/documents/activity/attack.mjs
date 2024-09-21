@@ -62,8 +62,8 @@ export default class AttackActivity extends ActivityMixin(AttackActivityData) {
 
   /**
    * @typedef {D20RollProcessConfiguration} AttackRollProcessConfiguration
-   * @param {string|boolean} [ammunition]  Specific ammunition to consume, or `false` to prevent any ammo consumption.
-   * @param {string} [attackMode]          Mode to use for making the attack and rolling damage.
+   * @property {string|boolean} [ammunition]  Specific ammunition to consume, or `false` to prevent any ammo usage.
+   * @property {string} [attackMode]          Mode to use for making the attack and rolling damage.
    */
 
   /**
@@ -107,6 +107,8 @@ export default class AttackActivity extends ActivityMixin(AttackActivityData) {
       .map(m => ({ ...m, selected: m.value === selectedAttackMode }));
 
     const rollConfig = foundry.utils.mergeObject({
+      ammunition: selectedAmmunition,
+      attackMode: selectedAttackMode,
       elvenAccuracy: this.actor?.getFlag("dnd5e", "elvenAccuracy")
         && CONFIG.DND5E.characterFlags.elvenAccuracy.abilities.includes(this.ability),
       halflingLucky: this.actor?.getFlag("dnd5e", "halflingLucky")
@@ -179,6 +181,8 @@ export default class AttackActivity extends ActivityMixin(AttackActivityData) {
       critical: rollConfig.rolls[0].options.criticalSuccess,
       fumble: rollConfig.rolls[0].options.criticalFailure,
       targetValue: rollConfig.rolls[0].options.target,
+      ammunition: rollConfig.ammunition,
+      attackMode: rollConfig.attackMode,
       mastery: rollConfig.rolls[0].options.mastery,
       elvenAccuracy: rollConfig.elvenAccuracy,
       halflingLucky: rollConfig.halflingLucky,
@@ -220,8 +224,11 @@ export default class AttackActivity extends ActivityMixin(AttackActivityData) {
       }
     } else if ( roll.options.attackMode?.startsWith("thrown") && !this.item.system.properties?.has("ret") ) {
       ammoUpdate = { id: this.item.id, quantity: Math.max(0, this.item.system.quantity - 1) };
+    } else if ( !roll.options.ammunition && dialogConfig.options?.ammunitionOptions?.length ) {
+      flags.ammunition = "";
     }
     if ( roll.options.attackMode ) flags.attackMode = roll.options.attackMode;
+    else if ( rollConfig.attackMode ) roll.options.attackMode = rollConfig.attackMode;
     if ( roll.options.mastery ) flags.mastery = roll.options.mastery;
     if ( !foundry.utils.isEmpty(flags) ) await this.item.setFlag("dnd5e", `last.${this.id}`, flags);
 
@@ -241,7 +248,7 @@ export default class AttackActivity extends ActivityMixin(AttackActivityData) {
         "The `dnd5e.rollAttack` hook has been deprecated and replaced with `dnd5e.rollAttackV2`.",
         { since: "DnD5e 4.0", until: "DnD5e 4.4" }
       );
-      const oldAmmoUpdate = [{ _id: ammoUpdate.id, "system.quantity": ammoUpdate.quantity }];
+      const oldAmmoUpdate = ammoUpdate ? [{ _id: ammoUpdate.id, "system.quantity": ammoUpdate.quantity }] : [];
       Hooks.callAll("dnd5e.rollAttack", this.item, roll, oldAmmoUpdate);
       if ( oldAmmoUpdate[0] ) {
         ammoUpdate.id = oldAmmoUpdate[0]._id;

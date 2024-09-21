@@ -754,6 +754,8 @@ export default class Item5e extends SystemDocumentMixin(Item) {
    *                                                                   activities and was posted directly to chat.
    */
   async use(config={}, dialog={}, message={}) {
+    if ( this.pack ) return;
+
     let event = config.event;
     if ( config.legacy !== false ) {
       foundry.utils.logCompatibilityWarning(
@@ -1846,8 +1848,8 @@ export default class Item5e extends SystemDocumentMixin(Item) {
 
   /** @inheritDoc */
   static migrateData(source) {
-    ActivitiesTemplate.initializeActivities(source);
     source = super.migrateData(source);
+    ActivitiesTemplate.initializeActivities(source);
     if ( source.type === "class" ) ClassData._migrateTraitAdvancement(source);
     else if ( source.type === "container" ) ContainerData._migrateWeightlessData(source);
     else if ( source.type === "equipment" ) EquipmentData._migrateStealth(source);
