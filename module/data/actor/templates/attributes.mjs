@@ -114,6 +114,12 @@ export default class AttributesFields {
     ac.armor = 10;
     ac.shield = ac.cover = 0;
     ac.min = ac.bonus = "";
+    ac.ability = {
+      light: "", medium: "", heavy: "", natural: ""
+    };
+    ac.bonuses = {
+      armored: "", unarmored: ""
+    };
   }
 
   /* -------------------------------------------- */
