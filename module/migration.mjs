@@ -529,7 +529,7 @@ export function migrateItemData(item, itemData, migrationData, flags={}) {
     && foundry.utils.isNewerVersion("4.1.0", itemData._stats?.systemVersion) ) {
     const properties = new Set(foundry.utils.getProperty(itemData, "system.properties") ?? [])
       .union(new Set(updateData["system.properties"] ?? []));
-    updateData["system.properties"] = Array.from(properties).concat(["noMaxDex"]);
+    updateData["system.properties"] = Array.from(properties).concat(["uncappedAbility"]);
   }
 
   if ( foundry.utils.getProperty(itemData, "flags.dnd5e.persistSourceMigration") ) {

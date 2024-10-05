@@ -554,9 +554,9 @@ export default class Actor5e extends SystemDocumentMixin(Actor) {
           });
           const armorData = armors[0].system.armor;
           const armorType = armors[0].system.type.value;
-          const currMaxDex = armorData.dex ?? CONFIG.DND5E.armorMaxDex[armorType] ?? Infinity;
+          const currMaxDex = armorData.dex ?? CONFIG.DND5E.armorMaxAbility[armorType] ?? Infinity;
           const maxDexBonus = simplifyBonus(this.system.attributes.ac.ability[armorType]);
-          const newMaxDex = armors[0].system.properties.has("noMaxDex") ? Infinity : currMaxDex + maxDexBonus;
+          const newMaxDex = armors[0].system.properties.has("uncappedAbility") ? Infinity : currMaxDex + maxDexBonus;
           ac.armor = armorData.value ?? ac.armor;
           ac.dex = Math.min(newMaxDex, this.system.abilities.dex?.mod ?? 0);
           ac.equippedArmor = armors[0];
