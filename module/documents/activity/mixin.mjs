@@ -2,7 +2,7 @@ import ActivitySheet from "../../applications/activity/activity-sheet.mjs";
 import ActivityUsageDialog from "../../applications/activity/activity-usage-dialog.mjs";
 import AbilityTemplate from "../../canvas/ability-template.mjs";
 import { ConsumptionError } from "../../data/activity/fields/consumption-targets-field.mjs";
-import { getTargetDescriptors } from "../../utils.mjs";
+import { areKeysPressed, getTargetDescriptors } from "../../utils.mjs";
 import PseudoDocumentMixin from "../mixins/pseudo-document.mjs";
 
 /**
@@ -196,7 +196,6 @@ export default Base => class extends PseudoDocumentMixin(Base) {
     const usageConfig = activity._prepareUsageConfig(usage);
 
     const dialogConfig = foundry.utils.mergeObject({
-      configure: true,
       applicationClass: this.metadata.usage.dialog
     }, dialog);
 
@@ -215,6 +214,8 @@ export default Base => class extends PseudoDocumentMixin(Base) {
       },
       hasConsumption: usageConfig.hasConsumption
     }, message);
+
+    this._applyKeybindings(usageConfig, dialogConfig, messageConfig);
 
     /**
      * A hook event that fires before an activity usage is configured.
@@ -421,6 +422,21 @@ export default Base => class extends PseudoDocumentMixin(Base) {
       }
     }
     await this.#applyUsageUpdates(updates);
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Apply any keybindings that might affect usage process.
+   * @param {ActivityUseConfiguration} config       Configuration info for the activation.
+   * @param {ActivityDialogConfiguration} dialog    Configuration info for the configuration dialog.
+   * @param {ActivityMessageConfiguration} message  Configuration info for the chat message created.
+   * @protected
+   */
+  _applyKeybindings(config, dialog, message) {
+    dialog.configure ??= !areKeysPressed(config.event, "skipDialogNormal")
+      && !areKeysPressed(config.event, "skipDialogAdvantage")
+      && !areKeysPressed(config.event, "skipDialogDisadvantage");
   }
 
   /* -------------------------------------------- */
