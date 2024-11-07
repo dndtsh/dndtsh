@@ -66,6 +66,20 @@ function _formatNumberAsNumerals(n) {
 /* -------------------------------------------- */
 
 /**
+ * Produce a number with the parts wrapped in their own spans.
+ * @param {number} value      A number for format.
+ * @param {object} [options]  Formatting options.
+ * @returns {string}
+ */
+export function formatNumberParts(value, options) {
+  if ( options.numerals ) throw new Error("Cannot segment numbers when formatted as numerals.");
+  return new Intl.NumberFormat(game.i18n.lang, options).formatToParts(value)
+    .reduce((str, { type, value }) => `${str}<span class="${type}">${value}</span>`, "");
+}
+
+/* -------------------------------------------- */
+
+/**
  * A helper for using Intl.NumberFormat within handlebars for format a range.
  * @param {number} min      The lower end of the range.
  * @param {number} max      The upper end of the range.
@@ -464,6 +478,7 @@ export async function preloadHandlebarsTemplates() {
     "systems/dnd5e/templates/shared/inventory.hbs",
     "systems/dnd5e/templates/shared/inventory2.hbs",
     "systems/dnd5e/templates/apps/parts/trait-list.hbs",
+    "systems/dnd5e/templates/apps/parts/traits-list.hbs",
 
     // Actor Sheet Partials
     "systems/dnd5e/templates/actors/parts/actor-classes.hbs",
@@ -475,6 +490,7 @@ export async function preloadHandlebarsTemplates() {
     "systems/dnd5e/templates/actors/parts/actor-warnings.hbs",
     "systems/dnd5e/templates/actors/parts/actor-warnings-dialog.hbs",
     "systems/dnd5e/templates/actors/parts/biography-textbox.hbs",
+    "systems/dnd5e/templates/actors/tabs/character-bastion.hbs",
     "systems/dnd5e/templates/actors/tabs/character-biography.hbs",
     "systems/dnd5e/templates/actors/tabs/character-details.hbs",
     "systems/dnd5e/templates/actors/tabs/creature-features.hbs",
@@ -495,6 +511,7 @@ export async function preloadHandlebarsTemplates() {
     "systems/dnd5e/templates/items/details/details-consumable.hbs",
     "systems/dnd5e/templates/items/details/details-container.hbs",
     "systems/dnd5e/templates/items/details/details-equipment.hbs",
+    "systems/dnd5e/templates/items/details/details-facility.hbs",
     "systems/dnd5e/templates/items/details/details-feat.hbs",
     "systems/dnd5e/templates/items/details/details-loot.hbs",
     "systems/dnd5e/templates/items/details/details-mountable.hbs",
@@ -547,7 +564,7 @@ export async function preloadHandlebarsTemplates() {
     "systems/dnd5e/templates/activity/columns/activity-column-uses.hbs",
     "systems/dnd5e/templates/activity/columns/activity-column-weight.hbs",
     "systems/dnd5e/templates/activity/activity-row-summary.hbs",
-    "systems/dnd5e/templates/activity/activity-usage-notes.hbs",
+    "systems/dnd5e/templates/activity/parts/activity-usage-notes.hbs",
 
     // Advancement Partials
     "systems/dnd5e/templates/advancement/parts/advancement-ability-score-control.hbs",
@@ -707,6 +724,7 @@ export function registerHandlebarsHelpers() {
     "dnd5e-itemContext": itemContext,
     "dnd5e-linkForUuid": (uuid, options) => linkForUuid(uuid, options.hash),
     "dnd5e-numberFormat": (context, options) => formatNumber(context, options.hash),
+    "dnd5e-numberParts": (context, options) => formatNumberParts(context, options.hash),
     "dnd5e-object": makeObject,
     "dnd5e-textFormat": formatText
   });
@@ -827,7 +845,9 @@ export function getHumanReadableAttributeLabel(attr, { actor }={}) {
   }
 
   if ( attr.startsWith(".") && actor ) {
-    const item = fromUuidSync(attr, { relative: actor });
+    // TODO: Remove `strict: false` when https://github.com/foundryvtt/foundryvtt/issues/11214 is resolved
+    // Only necessary when opening the token config for an actor in a compendium
+    const item = fromUuidSync(attr, { relative: actor, strict: false });
     return item?.name ?? attr;
   }
 
