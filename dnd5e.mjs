@@ -53,9 +53,6 @@ Hooks.once("init", function() {
   globalThis.dnd5e = game.dnd5e = Object.assign(game.system, globalThis.dnd5e);
   console.log(`D&D 5e | Initializing the D&D Fifth Game System - Version ${dnd5e.version}\n${DND5E.ASCII}`);
 
-  // TODO: Remove when v11 support is dropped.
-  CONFIG.compatibility.excludePatterns.push(/select/);
-
   // Record Configuration Values
   CONFIG.DND5E = DND5E;
   CONFIG.ActiveEffect.documentClass = documents.ActiveEffect5e;
@@ -74,6 +71,7 @@ Hooks.once("init", function() {
   Roll.TOOLTIP_TEMPLATE = "systems/dnd5e/templates/chat/roll-breakdown.hbs";
   CONFIG.Dice.BasicRoll = dice.BasicRoll;
   CONFIG.Dice.DamageRoll = dice.DamageRoll;
+  CONFIG.Dice.D20Die = dice.D20Die;
   CONFIG.Dice.D20Roll = dice.D20Roll;
   CONFIG.MeasuredTemplate.defaults.angle = 53.13; // 5e cone RAW should be 53.13 degrees
   CONFIG.Note.objectClass = canvas.Note5e;
@@ -87,6 +85,9 @@ Hooks.once("init", function() {
   // Configure module art & register module data
   game.dnd5e.moduleArt = new ModuleArt();
   registerModuleData();
+
+  // Configure bastions
+  game.dnd5e.bastion = new documents.Bastion();
 
   // Configure tooltips
   game.dnd5e.tooltips = new Tooltips5e();
@@ -198,11 +199,14 @@ Hooks.once("init", function() {
     types: ["spells"]
   });
 
-  CONFIG.Token.prototypeSheetClass = applications.TokenConfig5e;
-  DocumentSheetConfig.unregisterSheet(TokenDocument, "core", TokenConfig);
-  DocumentSheetConfig.registerSheet(TokenDocument, "dnd5e", applications.TokenConfig5e, {
-    label: "DND5E.SheetClassToken"
-  });
+  if ( game.release.generation === 12 ) {
+    // TODO: Update sheet classes and remove the above check
+    CONFIG.Token.prototypeSheetClass = applications.TokenConfig5e;
+    DocumentSheetConfig.unregisterSheet(TokenDocument, "core", TokenConfig);
+    DocumentSheetConfig.registerSheet(TokenDocument, "dnd5e", applications.TokenConfig5e, {
+      label: "DND5E.SheetClassToken"
+    });
+  }
 
   // Preload Handlebars helpers & partials
   utils.registerHandlebarsHelpers();
@@ -346,10 +350,8 @@ function _configureStatusEffects() {
   const addEffect = (effects, {special, ...data}) => {
     data = foundry.utils.deepClone(data);
     data._id = utils.staticID(`dnd5e${data.id}`);
-    if ( foundry.utils.isNewerVersion(game.version, 12) ) {
-      data.img = data.icon ?? data.img;
-      delete data.icon;
-    }
+    data.img = data.icon ?? data.img;
+    delete data.icon;
     effects.push(data);
     if ( special ) CONFIG.specialStatusEffects[special] = data.id;
   };
@@ -394,6 +396,20 @@ Hooks.once("setup", function() {
   // Apply custom item compendium
   game.packs.filter(p => p.metadata.type === "Item")
     .forEach(p => p.applicationClass = applications.item.ItemCompendium5e);
+
+  // Create CSS for currencies
+  const style = document.createElement("style");
+  const currencies = append => Object.entries(CONFIG.DND5E.currencies)
+    .map(([key, { icon }]) => `&.${key}${append ?? ""} { background-image: url("${icon}"); }`);
+  style.innerHTML = `
+    :is(.dnd5e2, .dnd5e2-journal) :is(i, span).currency {
+      ${currencies().join("\n")}
+    }
+    .dnd5e2 .form-group label.label-icon.currency {
+      ${currencies("::after").join("\n")}
+    }
+  `;
+  document.head.append(style);
 });
 
 /* --------------------------------------------- */
@@ -425,6 +441,8 @@ Hooks.once("i18nInit", () => {
       },
       DND5E: {
         LanguagesExotic: game.i18n.localize("DND5E.LanguagesExoticLegacy"),
+        LongRestHint: game.i18n.localize("DND5E.LongRestHintLegacy"),
+        LongRestHintGroup: game.i18n.localize("DND5E.LongRestHintGroupLegacy"),
         TargetRadius: game.i18n.localize("DND5E.TargetRadiusLegacy"),
         TraitArmorPlural: foundry.utils.mergeObject(
           _fallback.DND5E?.TraitArmorLegacyPlural ?? {},
@@ -460,6 +478,9 @@ Hooks.once("ready", function() {
 
   // Chat message listeners
   documents.ChatMessage5e.activateListeners();
+
+  // Bastion initialization
+  game.dnd5e.bastion.initializeUI();
 
   // Determine whether a system migration is required and feasible
   if ( !game.user.isGM ) return;

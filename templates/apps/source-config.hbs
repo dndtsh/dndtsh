@@ -19,11 +19,11 @@
     {{ formField identifier.field value=identifier.value placeholder=identifier.placeholder localize=true }}
     {{/if}}
     {{ formField fields.revision value=source.revision }}
-    {{#if hasSourceId}}
+    {{#if sourceAnchor}}
     <div class="form-group">
         <label>{{ localize "DND5E.SOURCE.FIELDS.source.uuid.label" }}</label>
-        <div class="source-uuid">
-            {{{ dnd5e-linkForUuid sourceUuid }}}
+        <div class="source-uuid form-fields">
+            {{{ sourceAnchor }}}
         </div>
     </div>
     {{/if}}

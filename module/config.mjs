@@ -479,6 +479,168 @@ DND5E.ammoIds = {
 };
 
 /* -------------------------------------------- */
+/*  Bastion Facilities                          */
+/* -------------------------------------------- */
+
+/**
+ * @typedef FacilityConfiguration
+ * @property {Record<string, Record<number, number>>} advancement  The number of free facilities of a given type awarded
+ *                                                                 at certain character levels.
+ * @property {Record<string, FacilityOrder>} orders                Orders that can be issued to a facility.
+ * @property {Record<string, FacilitySize>} sizes                  Facility size categories.
+ * @property {Record<string, SubtypeTypeConfiguration>} types      Facility types and subtypes.
+ */
+
+/**
+ * @typedef FacilityOrder
+ * @property {string} label       The human-readable name of the order.
+ * @property {string} icon        The SVG icon for this order.
+ * @property {boolean} [basic]    Whether this order can be issued to basic facilities.
+ * @property {number} [duration]  The amount of time taken to complete the order if different to a normal bastion turn.
+ * @property {boolean} [hidden]   This order is not normally available for execution.
+ */
+
+/**
+ * @typedef FacilitySize
+ * @property {string} label    The human-readable name of the size category.
+ * @property {number} days     The number of days to build the facility.
+ * @property {number} squares  The maximum area the facility may occupy in the bastion plan.
+ * @property {number} value    The cost in gold pieces to build the facility.
+ */
+
+/**
+ * Configuration data for bastion facilities.
+ * @type {FacilityConfiguration}
+ */
+DND5E.facilities = {
+  advancement: {
+    basic: { 5: 2 },
+    special: { 5: 2, 9: 4, 13: 5, 17: 6 }
+  },
+  orders: {
+    build: {
+      label: "DND5E.FACILITY.Orders.build.inf",
+      icon: "systems/dnd5e/icons/svg/facilities/build.svg"
+    },
+    change: {
+      label: "DND5E.FACILITY.Orders.change.inf",
+      icon: "systems/dnd5e/icons/svg/facilities/change.svg",
+      duration: 21
+    },
+    craft: {
+      label: "DND5E.FACILITY.Orders.craft.inf",
+      icon: "systems/dnd5e/icons/svg/facilities/craft.svg"
+    },
+    empower: {
+      label: "DND5E.FACILITY.Orders.empower.inf",
+      icon: "systems/dnd5e/icons/svg/facilities/empower.svg"
+    },
+    enlarge: {
+      label: "DND5E.FACILITY.Orders.enlarge.inf",
+      icon: "systems/dnd5e/icons/svg/facilities/enlarge.svg",
+      basic: true
+    },
+    harvest: {
+      label: "DND5E.FACILITY.Orders.harvest.inf",
+      icon: "systems/dnd5e/icons/svg/facilities/harvest.svg"
+    },
+    maintain: {
+      label: "DND5E.FACILITY.Orders.maintain.inf",
+      icon: "systems/dnd5e/icons/svg/facilities/maintain.svg"
+    },
+    recruit: {
+      label: "DND5E.FACILITY.Orders.recruit.inf",
+      icon: "systems/dnd5e/icons/svg/facilities/recruit.svg"
+    },
+    repair: {
+      label: "DND5E.FACILITY.Orders.repair.inf",
+      icon: "systems/dnd5e/icons/svg/facilities/repair.svg",
+      hidden: true
+    },
+    research: {
+      label: "DND5E.FACILITY.Orders.research.inf",
+      icon: "systems/dnd5e/icons/svg/facilities/research.svg"
+    },
+    trade: {
+      label: "DND5E.FACILITY.Orders.trade.inf",
+      icon: "systems/dnd5e/icons/svg/facilities/trade.svg"
+    }
+  },
+  sizes: {
+    cramped: {
+      label: "DND5E.FACILITY.Sizes.cramped",
+      days: 20,
+      squares: 4,
+      value: 500
+    },
+    roomy: {
+      label: "DND5E.FACILITY.Sizes.roomy",
+      days: 45,
+      squares: 16,
+      value: 1_000
+    },
+    vast: {
+      label: "DND5E.FACILITY.Sizes.vast",
+      days: 125,
+      squares: 36,
+      value: 3_000
+    }
+  },
+  types: {
+    basic: {
+      label: "DND5E.FACILITY.Types.Basic.Label.one",
+      subtypes: {
+        bedroom: "DND5E.FACILITY.Types.Basic.Bedroom",
+        diningRoom: "DND5E.FACILITY.Types.Basic.DiningRoom",
+        parlor: "DND5E.FACILITY.Types.Basic.Parlor",
+        courtyard: "DND5E.FACILITY.Types.Basic.Courtyard",
+        kitchen: "DND5E.FACILITY.Types.Basic.Kitchen",
+        storage: "DND5E.FACILITY.Types.Basic.Storage"
+      }
+    },
+    special: {
+      label: "DND5E.FACILITY.Types.Special.Label.one",
+      subtypes: {
+        arcaneStudy: "DND5E.FACILITY.Types.Special.ArcaneStudy",
+        armory: "DND5E.FACILITY.Types.Special.Armory",
+        barrack: "DND5E.FACILITY.Types.Special.Barrack",
+        garden: "DND5E.FACILITY.Types.Special.Garden",
+        library: "DND5E.FACILITY.Types.Special.Library",
+        sanctuary: "DND5E.FACILITY.Types.Special.Sanctuary",
+        smithy: "DND5E.FACILITY.Types.Special.Smithy",
+        storehouse: "DND5E.FACILITY.Types.Special.Storehouse",
+        workshop: "DND5E.FACILITY.Types.Special.Workshop",
+        gamingHall: "DND5E.FACILITY.Types.Special.GamingHall",
+        greenhouse: "DND5E.FACILITY.Types.Special.Greenhouse",
+        laboratory: "DND5E.FACILITY.Types.Special.Laboratory",
+        sacristy: "DND5E.FACILITY.Types.Special.Sacristy",
+        scriptorium: "DND5E.FACILITY.Types.Special.Scriptorium",
+        stable: "DND5E.FACILITY.Types.Special.Stable",
+        teleportationCircle: "DND5E.FACILITY.Types.Special.TeleportationCircle",
+        theater: "DND5E.FACILITY.Types.Special.Theater",
+        trainingArea: "DND5E.FACILITY.Types.Special.TrainingArea",
+        trophyRoom: "DND5E.FACILITY.Types.Special.TrophyRoom",
+        archive: "DND5E.FACILITY.Types.Special.Archive",
+        meditationChamber: "DND5E.FACILITY.Types.Special.MeditationChamber",
+        menagerie: "DND5E.FACILITY.Types.Special.Menagerie",
+        observatory: "DND5E.FACILITY.Types.Special.Observatory",
+        pub: "DND5E.FACILITY.Types.Special.Pub",
+        reliquary: "DND5E.FACILITY.Types.Special.Reliquary",
+        demiplane: "DND5E.FACILITY.Types.Special.Demiplane",
+        guildhall: "DND5E.FACILITY.Types.Special.Guildhall",
+        sanctum: "DND5E.FACILITY.Types.Special.Sanctum",
+        warRoom: "DND5E.FACILITY.Types.Special.WarRoom"
+      }
+    }
+  }
+};
+preLocalize("facilities.orders", { key: "label", sort: true });
+preLocalize("facilities.sizes", { key: "label", sort: true });
+preLocalize("facilities.types", { key: "label", sort: true });
+preLocalize("facilities.types.basic.subtypes", { sort: true });
+preLocalize("facilities.types.special.subtypes", { sort: true });
+
+/* -------------------------------------------- */
 /*  Tool Details                                */
 /* -------------------------------------------- */
 
@@ -872,8 +1034,18 @@ preLocalize("abilityConsumptionTypes", { sort: true });
 /**
  * @callback ConsumptionLabelsFunction
  * @this {ConsumptionTargetData}
- * @param {ActivityUseConfiguration} config    Configuration data for the activity usage.
- * @returns {{ label: string, hint: string }}  Label and hint text.
+ * @param {ActivityUseConfiguration} config  Configuration data for the activity usage.
+ * @param {object} [options={}]
+ * @param {boolean} [options.consumed]       Is this consumption currently set to be consumed?
+ * @returns {ConsumptionLabels}
+ */
+
+/**
+ * @typedef ConsumptionLabels
+ * @property {string} label      Label displayed for the consumption checkbox.
+ * @property {string} hint       Hint text describing what should be consumed.
+ * @property {{ type: string, message: string }} [notes]  Additional notes relating to the consumption to be performed.
+ * @property {boolean} [warn]    Display a warning icon indicating consumption will fail.
  */
 
 /**
@@ -1297,9 +1469,13 @@ preLocalize("armorTypes");
  * @enum {string}
  */
 DND5E.miscEquipmentTypes = {
-  clothing: "DND5E.EquipmentClothing",
-  trinket: "DND5E.EquipmentTrinket",
-  vehicle: "DND5E.EquipmentVehicle"
+  clothing: "DND5E.EQUIPMENT.Type.Clothing.Label",
+  ring: "DND5E.EQUIPMENT.Type.Ring.Label",
+  rod: "DND5E.EQUIPMENT.Type.Rod.Label",
+  trinket: "DND5E.EQUIPMENT.Type.Trinket.Label",
+  vehicle: "DND5E.EQUIPMENT.Type.Vehicle.Label",
+  wand: "DND5E.EQUIPMENT.Type.Wand.Label",
+  wondrous: "DND5E.EQUIPMENT.Type.Wondrous.Label"
 };
 preLocalize("miscEquipmentTypes", { sort: true });
 
@@ -1752,6 +1928,8 @@ DND5E.validProperties = {
     "weightlessContents"
   ]),
   equipment: new Set([
+    "ada",
+    "foc",
     "mgc",
     "stealthDisadvantage"
   ]),
@@ -1837,6 +2015,7 @@ preLocalize("lootTypes", { key: "label" });
  * @property {string} label         Localized label for the currency.
  * @property {string} abbreviation  Localized abbreviation for the currency.
  * @property {number} conversion    Number by which this currency should be multiplied to arrive at a standard value.
+ * @property {string} icon          Icon representing the currency in the interface.
  */
 
 /**
@@ -1848,30 +2027,144 @@ DND5E.currencies = {
   pp: {
     label: "DND5E.CurrencyPP",
     abbreviation: "DND5E.CurrencyAbbrPP",
-    conversion: 0.1
+    conversion: 0.1,
+    icon: "systems/dnd5e/icons/currency/platinum.webp"
   },
   gp: {
     label: "DND5E.CurrencyGP",
     abbreviation: "DND5E.CurrencyAbbrGP",
-    conversion: 1
+    conversion: 1,
+    icon: "systems/dnd5e/icons/currency/gold.webp"
   },
   ep: {
     label: "DND5E.CurrencyEP",
     abbreviation: "DND5E.CurrencyAbbrEP",
-    conversion: 2
+    conversion: 2,
+    icon: "systems/dnd5e/icons/currency/electrum.webp"
   },
   sp: {
     label: "DND5E.CurrencySP",
     abbreviation: "DND5E.CurrencyAbbrSP",
-    conversion: 10
+    conversion: 10,
+    icon: "systems/dnd5e/icons/currency/silver.webp"
   },
   cp: {
     label: "DND5E.CurrencyCP",
     abbreviation: "DND5E.CurrencyAbbrCP",
-    conversion: 100
+    conversion: 100,
+    icon: "systems/dnd5e/icons/currency/copper.webp"
   }
 };
 preLocalize("currencies", { keys: ["label", "abbreviation"] });
+
+/* -------------------------------------------- */
+
+/**
+ * @typedef CraftingConfiguration
+ * @property {CraftingCostsMultiplier} consumable        Discounts for crafting a magical consumable.
+ * @property {Record<string, CraftingCosts>} exceptions  Crafting costs for items that are exception to the general
+ *                                                       crafting rules, by identifier.
+ * @property {Record<string, CraftingCosts>} magic       Magic item crafting costs by rarity.
+ * @property {CraftingCostsMultiplier} mundane           Multipliers for crafting mundane items.
+ * @property {Record<number, CraftingCosts>} scrolls     Crafting costs for spell scrolls by level.
+ */
+
+/**
+ * @typedef CraftingCostsMultiplier
+ * @property {number} days  The days multiplier.
+ * @property {number} gold  The gold multiplier.
+ */
+
+/**
+ * @typedef CraftingCosts
+ * @property {number} days  The number of days required to craft the item, not including its base item.
+ * @property {number} gold  The amount of gold required for the raw materials, not including the base item.
+ */
+
+/**
+ * Configuration data for crafting costs.
+ * @type {CraftingConfiguration}
+ */
+DND5E.crafting = {
+  consumable: {
+    days: .5,
+    gold: .5
+  },
+  exceptions: {
+    "potion-of-healing": {
+      days: 1,
+      gold: 25
+    }
+  },
+  magic: {
+    common: {
+      days: 5,
+      gold: 50
+    },
+    uncommon: {
+      days: 10,
+      gold: 200
+    },
+    rare: {
+      days: 50,
+      gold: 2_000
+    },
+    veryRare: {
+      days: 125,
+      gold: 20_000
+    },
+    legendary: {
+      days: 250,
+      gold: 100_000
+    }
+  },
+  mundane: {
+    days: .1,
+    gold: .5
+  },
+  scrolls: {
+    0: {
+      days: 1,
+      gold: 15
+    },
+    1: {
+      days: 1,
+      gold: 25
+    },
+    2: {
+      days: 3,
+      gold: 100
+    },
+    3: {
+      days: 5,
+      gold: 150
+    },
+    4: {
+      days: 10,
+      gold: 1_000
+    },
+    5: {
+      days: 25,
+      gold: 1_500
+    },
+    6: {
+      days: 40,
+      gold: 10_000
+    },
+    7: {
+      days: 50,
+      gold: 12_500
+    },
+    8: {
+      days: 60,
+      gold: 15_000
+    },
+    9: {
+      days: 120,
+      gold: 50_000
+    }
+  }
+};
 
 /* -------------------------------------------- */
 /*  Damage                                      */
@@ -2955,6 +3248,7 @@ DND5E.consumableResources = [
  * @property {string} [exclusiveGroup]  Any status effects with the same group will not be able to be applied at the
  *                                      same time through the token HUD (multiple statuses applied through other
  *                                      effects can still coexist).
+ * @property {number} [coverBonus]      A bonus this condition provides to AC and dexterity saving throws.
  */
 
 /**
@@ -3161,13 +3455,15 @@ DND5E.statusEffects = {
     name: "EFFECT.DND5E.StatusHalfCover",
     icon: "systems/dnd5e/icons/svg/statuses/cover-half.svg",
     order: 2,
-    exclusiveGroup: "cover"
+    exclusiveGroup: "cover",
+    coverBonus: 2
   },
   coverThreeQuarters: {
     name: "EFFECT.DND5E.StatusThreeQuartersCover",
     icon: "systems/dnd5e/icons/svg/statuses/cover-three-quarters.svg",
     order: 3,
-    exclusiveGroup: "cover"
+    exclusiveGroup: "cover",
+    coverBonus: 5
   },
   coverTotal: {
     name: "EFFECT.DND5E.StatusTotalCover",
@@ -3338,6 +3634,7 @@ DND5E.epicBoonInterval = 30000;
  *                                         this trait's data stored on the actor?
  * @property {string} [configKey]          If the list of trait options doesn't match the name of the trait, where can
  *                                         the options be found within `CONFIG.DND5E`?
+ * @property {Boolean|Number} [dataType]   Type of data represented.
  * @property {string} [labelKeyPath]       If config is an enum of objects, where can the label be found?
  * @property {object} [subtypes]           Configuration for traits that take some sort of base item.
  * @property {string} [subtypes.keyPath]   Path to subtype value on base items, should match a category key.
@@ -3438,6 +3735,14 @@ DND5E.traits = {
     },
     icon: "systems/dnd5e/icons/svg/trait-damage-vulnerabilities.svg",
     configKey: "damageTypes"
+  },
+  dm: {
+    labels: {
+      title: "DND5E.DamMod",
+      localization: "DND5E.TraitDMPlural"
+    },
+    configKey: "damageTypes",
+    dataType: Number
   },
   ci: {
     labels: {
@@ -3623,11 +3928,15 @@ preLocalize("groupTypes");
  *
  * @typedef {object} ActivityTypeConfiguration
  * @property {typeof Activity} documentClass  The activity's document class.
+ * @property {boolean} [configurable=true]    Whether the activity is editable via the UI.
  * @property {boolean} [hidden]               Should this activity type be hidden in the selection dialog?
  */
 DND5E.activityTypes = {
   attack: {
     documentClass: activities.AttackActivity
+  },
+  cast: {
+    documentClass: activities.CastActivity
   },
   check: {
     documentClass: activities.CheckActivity
@@ -3638,8 +3947,15 @@ DND5E.activityTypes = {
   enchant: {
     documentClass: activities.EnchantActivity
   },
+  forward: {
+    documentClass: activities.ForwardActivity
+  },
   heal: {
     documentClass: activities.HealActivity
+  },
+  order: {
+    documentClass: activities.OrderActivity,
+    configurable: false
   },
   save: {
     documentClass: activities.SaveActivity
@@ -3717,6 +4033,7 @@ DND5E.defaultArtwork = {
     consumable: "systems/dnd5e/icons/svg/items/consumable.svg",
     container: "systems/dnd5e/icons/svg/items/container.svg",
     equipment: "systems/dnd5e/icons/svg/items/equipment.svg",
+    facility: "systems/dnd5e/icons/svg/items/facility.svg",
     feat: "systems/dnd5e/icons/svg/items/feature.svg",
     loot: "systems/dnd5e/icons/svg/items/loot.svg",
     race: "systems/dnd5e/icons/svg/items/race.svg",

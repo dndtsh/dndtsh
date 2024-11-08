@@ -244,7 +244,7 @@ export default function ItemSheetV2Mixin(Base) {
 
       // Play mode only.
       if ( this._mode === this.constructor.MODES.PLAY ) {
-        html.find(".item-image").on("click", this._onShowIcon.bind(this));
+        html.find(".sheet-header .item-image").on("click", this._onShowIcon.bind(this));
       }
     }
 
@@ -303,8 +303,9 @@ export default function ItemSheetV2Mixin(Base) {
 
       if ( activeTab === "effects" ) {
         return ActiveEffect.implementation.create({
-          name: game.i18n.localize("DND5E.EffectNew"),
-          img: "icons/svg/aura.svg"
+          name: this.document.name,
+          img: this.document.img,
+          origin: this.document.uuid
         }, { parent: this.item, renderSheet: true });
       }
 
@@ -314,7 +315,10 @@ export default function ItemSheetV2Mixin(Base) {
 
       if ( activeTab === "activities" ) {
         return dnd5e.documents.activity.UtilityActivity.createDialog({}, {
-          parent: this.item, types: Object.keys(CONFIG.DND5E.activityTypes)
+          parent: this.item,
+          types: Object.entries(CONFIG.DND5E.activityTypes).filter(([, { configurable }]) => {
+            return configurable !== false;
+          }).map(([k]) => k)
         });
       }
     }

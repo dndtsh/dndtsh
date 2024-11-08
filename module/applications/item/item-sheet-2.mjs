@@ -35,7 +35,7 @@ export default class ItemSheet5e2 extends ItemSheetV2Mixin(ItemSheet5e) {
   /** @inheritDoc */
   async getData(options) {
     const context = await super.getData(options);
-    const { activities, spellcasting } = this.item.system;
+    const { activities, building, craft, order, spellcasting, type } = this.item.system;
     const target = this.item.type === "spell" ? this.item.system.target : null;
 
     // Effects
@@ -135,10 +135,50 @@ export default class ItemSheet5e2 extends ItemSheetV2Mixin(ItemSheet5e) {
     }));
 
     // Activities
-    context.activities = (activities ?? []).map(({ _id: id, name, img, sort }) => ({
+    context.activities = (activities ?? []).filter(a => {
+      return CONFIG.DND5E.activityTypes[a.type]?.configurable !== false;
+    }).map(({ _id: id, name, img, sort }) => ({
       id, name, sort,
       img: { src: img, svg: img?.endsWith(".svg") }
     }));
+
+    // Facilities
+    if ( this.item.type === "facility" ) {
+      context.orders = Object.entries(CONFIG.DND5E.facilities.orders).reduce((obj, [value, config]) => {
+        const { label, basic, hidden } = config;
+        if ( hidden ) return obj;
+        // TODO: More hard-coding that we can potentially avoid.
+        if ( value === "build" ) {
+          if ( !building.built ) obj.executable.push({ value, label });
+          return obj;
+        }
+        if ( value === "change" ) {
+          if ( type.subtype === "garden" ) obj.executable.push({ value, label });
+          return obj;
+        }
+        if ( type.value === "basic" ) {
+          if ( !building.built ) return obj;
+          if ( basic ) obj.executable.push({ value, label });
+        } else if ( (type.value === "special") && !basic ) {
+          obj.available.push({ value, label });
+          if ( (value === order) || (value === "maintain") ) obj.executable.push({ value, label });
+        }
+        return obj;
+      }, { available: [], executable: [] });
+    }
+
+    if ( (type?.value === "special") && ((order === "craft") || (order === "harvest")) ) {
+      context.canCraft = true;
+      context.isHarvesting = order === "harvest";
+      const crafting = await fromUuid(craft.item);
+      if ( crafting ) {
+        context.craft = {
+          img: crafting.img,
+          name: crafting.name,
+          contentLink: crafting.toAnchor().outerHTML
+        };
+      }
+    }
 
     return context;
   }
@@ -256,6 +296,17 @@ export default class ItemSheet5e2 extends ItemSheetV2Mixin(ItemSheet5e) {
   /* -------------------------------------------- */
 
   /**
+   * Handle removing the Item currently being crafted.
+   * @returns {Promise}
+   * @protected
+   */
+  _onRemoveCraft() {
+    return this.submit({ updateData: { "system.craft": null } });
+  }
+
+  /* -------------------------------------------- */
+
+  /**
    * Handle performing some sheet action.
    * @param {PointerEvent} event  The originating event.
    * @returns {Promise|void}
@@ -268,6 +319,7 @@ export default class ItemSheet5e2 extends ItemSheetV2Mixin(ItemSheet5e) {
       case "addRecovery": return this._onAddRecovery();
       case "deleteActivity": return this._onDeleteActivity(target);
       case "deleteRecovery": return this._onDeleteRecovery(target);
+      case "removeCraft": return this._onRemoveCraft();
     }
   }
 
@@ -325,6 +377,30 @@ export default class ItemSheet5e2 extends ItemSheetV2Mixin(ItemSheet5e) {
       delete data._id;
       this.item.createActivity(type, data, { renderSheet: false });
     }
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Handle dropping another item onto this item.
+   * @param {DragEvent} event  The drag event.
+   * @param {object} data      The dropped data.
+   */
+  async _onDropItem(event, data) {
+    const item = await Item.implementation.fromDropData(data);
+    if ( (item?.type === "spell") && this.item.system.activities ) this._onDropSpell(event, item);
+    else this._onDropAdvancement(event, data);
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Handle creating a "Cast" activity when dropping a spell.
+   * @param {DragEvent} event  The drag event.
+   * @param {Item5e} item      The dropped item.
+   */
+  _onDropSpell(event, item) {
+    this.item.createActivity("cast", { spell: { uuid: item.uuid } });
   }
 
   /* -------------------------------------------- */

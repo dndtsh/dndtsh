@@ -88,6 +88,10 @@ export default class ChatMessage5e extends ChatMessage {
   prepareData() {
     super.prepareData();
     this._shimFlags();
+    if ( !this.flags.dnd5e?.item?.data && this.flags.dnd5e?.item?.id ) {
+      const itemData = this.getFlag("dnd5e", "use.consumed.deleted")?.find(i => i._id === this.flags.dnd5e.item.id);
+      if ( itemData ) Object.defineProperty(this.flags.dnd5e.item, "data", { value: itemData });
+    }
     dnd5e.registry.messages.track(this);
   }
 
@@ -108,6 +112,7 @@ export default class ChatMessage5e extends ChatMessage {
     this._enrichChatCard(html[0]);
     this._collapseTrays(html[0]);
     this._activateActivityListeners(html[0]);
+    dnd5e.bastion._activateChatListeners(this, html[0]);
 
     /**
      * A hook event that fires after dnd5e-specific chat message modifications have completed.
@@ -374,9 +379,7 @@ export default class ChatMessage5e extends ChatMessage {
    */
   _enrichAttackTargets(html) {
     const attackRoll = this.rolls[0];
-    const visibility = game.settings.get("dnd5e", "attackRollVisibility");
-    const isVisible = game.user.isGM || (visibility !== "none");
-    if ( !isVisible || !(attackRoll instanceof dnd5e.dice.D20Roll) ) return;
+    if ( !(attackRoll instanceof dnd5e.dice.D20Roll) ) return;
 
     const masteryConfig = CONFIG.DND5E.weaponMasteries[attackRoll.options.mastery];
     if ( masteryConfig ) {
@@ -390,6 +393,10 @@ export default class ChatMessage5e extends ChatMessage {
       p.innerHTML = `<strong>${game.i18n.format("DND5E.WEAPON.Mastery.Flavor")}</strong> ${mastery}`;
       (html.querySelector(".chat-card") ?? html.querySelector(".message-content"))?.appendChild(p);
     }
+
+    const visibility = game.settings.get("dnd5e", "attackRollVisibility");
+    const isVisible = game.user.isGM || (visibility !== "none");
+    if ( !isVisible ) return;
 
     const targets = this.getFlag("dnd5e", "targets");
     if ( !targets?.length ) return;
@@ -415,10 +422,10 @@ export default class ChatMessage5e extends ChatMessage {
         <li data-uuid="${uuid}" class="target ${isMiss ? "miss" : "hit"}">
           <i class="fas ${isMiss ? "fa-times" : "fa-check"}"></i>
           <div class="name">${name}</div>
-          ${ac ? `
+          ${(ac !== "") ? `
           <div class="ac">
             <i class="fas fa-shield-halved"></i>
-            <span>${ac}</span>
+            <span>${(ac === null) ? "&infin;" : ac}</span>
           </div>
           ` : ""}
         </li>
@@ -804,11 +811,14 @@ export default class ChatMessage5e extends ChatMessage {
    * @param {ChatPopout} app  The ChatPopout Application instance.
    * @param {jQuery} html     The rendered Application HTML.
    */
-  static onRenderChatPopout(app, [html]) {
+  static onRenderChatPopout(app, html) {
+    html = html instanceof HTMLElement ? html : html[0];
     const close = html.querySelector(".header-button.close");
-    close.innerHTML = '<i class="fas fa-times"></i>';
-    close.dataset.tooltip = game.i18n.localize("Close");
-    close.setAttribute("aria-label", close.dataset.tooltip);
+    if ( close ) {
+      close.innerHTML = '<i class="fas fa-times"></i>';
+      close.dataset.tooltip = game.i18n.localize("Close");
+      close.setAttribute("aria-label", close.dataset.tooltip);
+    }
     html.querySelector(".message-metadata [data-context-menu]")?.remove();
   }
 
@@ -816,9 +826,8 @@ export default class ChatMessage5e extends ChatMessage {
 
   /**
    * Wait to apply appropriate element heights until after the chat log has completed its initial batch render.
-   * @param {jQuery} html  The chat log HTML.
    */
-  static onRenderChatLog([html]) {
+  static onRenderChatLog() {
     if ( !game.settings.get("dnd5e", "autoCollapseItemCards") ) {
       requestAnimationFrame(() => {
         // FIXME: Allow time for transitions to complete. Adding a transitionend listener does not appear to work, so
@@ -847,7 +856,7 @@ export default class ChatMessage5e extends ChatMessage {
    * @param {boolean} [options.releaseAll=false]  Force all modifiers to be considered released.
    */
   static toggleModifiers({ releaseAll=false }={}) {
-    document.querySelectorAll(".chat-sidebar > ol").forEach(chatlog => {
+    document.querySelectorAll(".chat-sidebar > ol, #chat .chat-scroll > ol").forEach(chatlog => {
       for ( const key of Object.values(KeyboardManager.MODIFIER_KEYS) ) {
         if ( game.keyboard.isModifierActive(key) && !releaseAll ) chatlog.dataset[`modifier${key}`] = "";
         else delete chatlog.dataset[`modifier${key}`];

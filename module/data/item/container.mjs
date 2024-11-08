@@ -107,6 +107,7 @@ export default class ContainerData extends ItemDataModel.mixin(
   prepareDerivedData() {
     super.prepareDerivedData();
     this.prepareDescriptionData();
+    this.preparePhysicalData();
   }
 
   /* -------------------------------------------- */
@@ -302,5 +303,20 @@ export default class ContainerData extends ItemDataModel.mixin(
     }
 
     super._onUpdate(changed, options, userId);
+  }
+
+  /* -------------------------------------------- */
+
+  /** @inheritDoc */
+  async _onDelete(options, userId) {
+    super._onDelete(options, userId);
+    if ( (userId !== game.user.id) || !options.deleteContents ) return;
+
+    // Delete a container's contents when it is deleted
+    const contents = await this.allContainedItems;
+    if ( contents?.size ) await Item.deleteDocuments(Array.from(contents.map(i => i.id)), {
+      pack: this.parent.pack,
+      parent: this.parent.parent
+    });
   }
 }
