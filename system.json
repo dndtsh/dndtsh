@@ -9,7 +9,7 @@
     },
     "url": "https://dndthestronghold.nl",
     "manifest": "https://raw.githubusercontent.com/dndtsh/dndtsh/refs/heads/4.1.x/system.json",
-    "download": "https://github.com/dndtsh/durven-en-doen/releases/download/release-4.1.0/durven-en-doen-master.zip",
+    "download": "https://github.com/dndtsh/dndtsh/releases/download/release-4.1.1/dndtsh.zip",
     "authors": [
         {
             "name": "Durven & Doen The StrongHold",
