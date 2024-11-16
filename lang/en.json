@@ -137,11 +137,11 @@
     "activation": {
       "label": "Activatie",
       "condition": {
-        "label": "Activatie Condition",
-        "hint": "Condition required to activate this activity."
+        "label": "Activatie omstandigheid",
+        "hint": "onder welke omstandigheid kan het geactiveerd worden."
       },
       "override": {
-        "label": "Override Activation",
+        "label": "Activatie overschrijven",
         "hint": "Use these activation values instead of the item's when using this activity."
       },
       "type": {
@@ -155,25 +155,25 @@
     }
   },
   "Category": {
-    "Standard": "Standard",
-    "Time": "Time",
+    "Standard": "Standaard",
+    "Time": "Tijd",
     "Monster": "Monster",
-    "Vehicle": "Vehicle"
+    "Vehicle": "Voertuig"
   }
 },
 
 "DND5E.ACTIVITY": {
   "Action": {
-    "Create": "Create Activity",
-    "Delete": "Delete Activity"
+    "Create": "maak Activiteit",
+    "Delete": "Delete Activiteit"
   },
   "Title": {
-    "one": "Activity",
-    "other": "Activities"
+    "one": "Activiteit",
+    "other": "Activiteiten"
   },
   "FIELDS": {
     "description": {
-      "label": "Description",
+      "label": "Omschrijving",
       "chatFlavor": {
         "label": "Chat Flavor",
         "hint": "Additional text displayed in the activation chat message."
